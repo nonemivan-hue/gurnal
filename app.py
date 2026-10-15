@@ -64,9 +64,10 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.2.1'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
+APP_VERSION = '1.2.2'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
 # 1.2.0 — поле «Примечание» во всех приказах + загрузка сотрудников и видов приказов из Excel
 # 1.2.1 — куратору разрешено редактирование справочника «Виды приказов»
+# 1.2.2 — панель загрузки приказов в журналы из Excel + подробное описание обновления программы
 
 
 def setup_logging():
@@ -787,6 +788,30 @@ def order_types_import():
 
 # ---------------------------------------------------------------- журналы
 
+JOURNAL_ALIASES = {  # частые варианты названия журнала в Excel (в нижнем регистре)
+    'opeka': ('опека',),
+    'nuzhdaemost': ('нуждаемость', 'нуждающиеся'),
+    'profilaktika': ('профилактика', 'профилактический учет', 'профилактический учёт'),
+}
+
+
+def _journal_key(raw, title_to_key):
+    """Название журнала из Excel -> ключ журнала ('opeka' и т.п.) или None."""
+    s = _norm(raw).lower().replace('ё', 'е').strip()
+    if not s:
+        return None
+    for k, variants in JOURNAL_ALIASES.items():
+        if s in [v.replace('ё', 'е') for v in variants]:
+            return k
+    return title_to_key.get(s)
+
+
+def _orders_xlsx_headers(journal):
+    """Заголовки столбцов для шаблона/импорта приказов конкретного журнала."""
+    return ['№ приказа', 'Дата приказа', 'Вид приказа', 'Наименование приказа',
+            'Ф.И.О. в отношении кого приказ', 'ФИО специалиста', 'Примечание']
+
+
 def next_order_number(conn, journal):
     conn.execute('UPDATE counters SET value=value+1 WHERE journal=?', (journal,))
     row = conn.execute('SELECT value FROM counters WHERE journal=?', (journal,)).fetchone()
@@ -885,6 +910,187 @@ def journal_create(journal):
     conn.close()
     audit('ПРИКАЗ СОЗДАН', f'журнал={JOURNAL_TITLES.get(journal)}, №={order_number}, по кому={person_fio}')
     flash('Приказ создан', 'ok')
+    return redirect(url_for('journal_list', journal=journal))
+
+
+@app.route('/journal/<journal>/template')
+def journal_template(journal):
+    """Шаблон Excel для загрузки приказов в журнал (заполните лист и импортируйте)."""
+    if journal not in JOURNAL_TYPES:
+        abort(404)
+    user = current_user()
+    if not can_access_journal(user, journal):
+        abort(403)
+    _need_xlsx()
+    conn = get_db()
+    types = conn.execute('SELECT name FROM order_types WHERE kind=? ORDER BY name',
+                         (journal,)).fetchall()
+    maxn = 0
+    for r in conn.execute('SELECT order_number FROM orders WHERE journal=?', (journal,)):
+        base = _norm(r['order_number']).split('-')[0]
+        if base.isdigit():
+            maxn = max(maxn, int(base))
+    conn.close()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = JOURNAL_TITLES[journal]
+    ws.append(_orders_xlsx_headers(journal))
+    # примеры заполнения
+    ws.append([f'{maxn + 1}{JOURNAL_SUFFIX[journal]}', date.today().isoformat(),
+               JOURNAL_TITLES[journal], types[0]['name'] if types else 'Наименование приказа',
+               'Иванов Иван Иванович', 'Петров П. П.', 'Примечание (необязательно)'])
+    ws.append(['', '', JOURNAL_TITLES[journal],
+               types[1]['name'] if len(types) > 1 else 'Другой приказ',
+               'Сидорова Анна Петровна', '', ''])
+    for c in ws[1]:
+        c.font = Font(bold=True)
+    for col, w in zip('ABCDEFG', (12, 14, 16, 40, 32, 26, 30)):
+        ws.column_dimensions[col].width = w
+    return _mem_xlsx(wb, f'шаблон_приказы_{journal}.xlsx')
+
+
+@app.route('/journal/<journal>/import', methods=['POST'])
+def journal_import(journal):
+    """Массовая загрузка приказов в журнал из файла Excel (.xlsx).
+
+    Формат: первая строка — заголовки (см. шаблон). Столбцы «№ приказа» и
+    «Дата приказа» необязательны: номер присваивается автоматически (с суффиксом
+    журнала), дата — текущая. Наименование приказа сверяется со справочником
+    «Виды приказов» своего журнала; при отсутствии — вид приказа создаётся.
+    Дубликаты (тот же номер либо дата+наименование+ФИО) пропускаются.
+    Скан-коды PDF через Excel не загружаются — их можно приложить к приказу
+    вручную после импорта.
+    """
+    if journal not in JOURNAL_TYPES:
+        abort(404)
+    user = current_user()
+    if not can_access_journal(user, journal):
+        abort(403)
+    _need_xlsx()
+    f = request.files.get('file')
+    if not f or not f.filename.lower().endswith('.xlsx'):
+        flash('Выберите файл Excel в формате .xlsx', 'err')
+        return redirect(url_for('journal_list', journal=journal))
+    try:
+        rows = _read_xlsx_rows(io.BytesIO(f.read()))
+    except Exception as e:
+        flash(f'Не удалось прочитать файл: {e}', 'err')
+        return redirect(url_for('journal_list', journal=journal))
+    if len(rows) < 2:
+        flash('В файле нет данных (нужны заголовок и хотя бы одна строка)', 'err')
+        return redirect(url_for('journal_list', journal=journal))
+    m = _cell_map(rows[0])
+    ci_num = _pick(m, '№приказа', 'нприказа', 'номерприказа', 'номер', 'num')
+    ci_date = _pick(m, 'датаприказа', 'дата', 'date')
+    ci_kind = _pick(m, 'видприказа', 'вид', 'журнал')
+    ci_name = _pick(m, 'наименованиеприказа', 'наименование', 'приказ')
+    ci_person = _pick(m, 'фиовотношениикогоприказ', 'фиовотношениикого',
+                      'фио', 'фивоотношениикого')
+    ci_spec = _pick(m, 'фиоспециалиста', 'специалист', 'фиоспеца')
+    ci_note = _pick(m, 'примечание', 'комментарий', 'note')
+    if ci_name is None and ci_person is None:
+        flash('В файле не найдены столбцы «Наименование приказа» / «Ф.И.О. в отношении кого»', 'err')
+        return redirect(url_for('journal_list', journal=journal))
+    title_to_key = {t.lower(): k for k, t in JOURNAL_TITLES.items()}
+    today = date.today().isoformat()
+    conn = get_db()
+    created = skipped = 0
+    errors = []
+
+    def cell(row, idx):
+        return row[idx] if idx is not None and idx < len(row) else ''
+
+    # существующие номера и «отпечатки» приказов журнала — для защиты от дублей
+    existing_nums = set()
+    existing_fp = set()
+    for r in conn.execute('SELECT o.order_number, o.order_date, o.person_fio, '
+                          't.name AS tname FROM orders o '
+                          'LEFT JOIN order_types t ON t.id=o.order_type_id '
+                          'WHERE o.journal=?', (journal,)):
+        existing_nums.add(_norm(r['order_number']).lower())
+        existing_fp.add((_norm(r['order_date']), _norm(r['tname']).lower(),
+                         _norm(r['person_fio']).lower()))
+
+    def add_order(num, dt, tid, person, spec, note):
+        nonlocal created, skipped
+        fp = (dt, '', _norm(person).lower())
+        type_name = ''
+        if tid:
+            tn = conn.execute('SELECT name FROM order_types WHERE id=?', (tid,)).fetchone()
+            type_name = tn['name'] if tn else ''
+            fp = (dt, _norm(type_name).lower(), _norm(person).lower())
+        if num.lower() in existing_nums or fp in existing_fp:
+            skipped += 1
+            errors.append(f'дубликат пропущен: № {num} / {dt} / {person}')
+            return
+        conn.execute(
+            'INSERT INTO orders(journal, order_number, order_date, order_type_id, '
+            'person_fio, specialist_fio, note, scan_path) VALUES (?,?,?,?,?,?,?,?)',
+            (journal, num, dt, tid, person, spec, note, None))
+        existing_nums.add(num.lower())
+        existing_fp.add(fp)
+        base = num.split('-')[0]
+        if base.isdigit():
+            conn.execute('UPDATE counters SET value=MAX(value,?) WHERE journal=?',
+                         (int(base), journal))
+        created += 1
+
+    for n, row in enumerate(rows[1:], start=2):
+        kind_raw = cell(row, ci_kind)
+        key = _journal_key(kind_raw, title_to_key) if kind_raw else journal
+        if key and key != journal:      # строка относится к другому журналу
+            skipped += 1
+            errors.append(f'строка {n}: вид приказа «{kind_raw}» не относится к журналу '
+                          f'«{JOURNAL_TITLES[journal]}»')
+            continue
+        person = cell(row, ci_person)
+        name = cell(row, ci_name)
+        if not person and not name:
+            skipped += 1
+            continue
+        tid = None
+        if name:
+            trow = conn.execute('SELECT id FROM order_types WHERE kind=? AND '
+                                'LOWER(TRIM(name))=?', (journal, _norm(name).lower())).fetchone()
+            if trow:
+                tid = trow['id']
+            else:  # наименование ещё не есть в справочнике — регистрируем его
+                try:
+                    cur = conn.execute('INSERT INTO order_types(kind,name) VALUES (?,?)',
+                                       (journal, _norm(name)))
+                    tid = cur.lastrowid
+                    errors.append(f'строка {n}: вид приказа «{name}» добавлен в справочник')
+                except sqlite3.IntegrityError:
+                    trow = conn.execute('SELECT id FROM order_types WHERE kind=? AND '
+                                        'LOWER(TRIM(name))=?',
+                                        (journal, _norm(name).lower())).fetchone()
+                    tid = trow['id'] if trow else None
+        dt = cell(row, ci_date) or today
+        dnum = _norm(dt).replace('/', '-').replace('.', '-')
+        parts = dnum.split('-')
+        if len(parts) == 3:
+            y, mo, da = parts[0], parts[1].zfill(2), parts[2].zfill(2)
+            if len(y) == 4:
+                dt = f'{y}-{mo}-{da}'
+            elif len(y) <= 2:           # формат ДД-ММ-ГГ -> ГГГГ-ММ-ДД
+                dt = f'20{y.zfill(2)}-{mo}-{da}'
+        num = cell(row, ci_num)
+        if num:
+            num = _norm(num)
+            if '-' not in num:          # добавляем суффикс журнала: 15 -> 15-оп
+                num += JOURNAL_SUFFIX[journal]
+        else:
+            num = next_order_number(conn, journal)
+        add_order(num, dt, tid, person, cell(row, ci_spec), cell(row, ci_note))
+    conn.commit()
+    conn.close()
+    audit('ИМПОРТ ПРИКАЗОВ ИЗ EXCEL',
+          f'журнал={JOURNAL_TITLES.get(journal)}, файл={f.filename}, '
+          f'создано={created}, пропущено={skipped}')
+    msg = f'Импорт завершён: создано — {created}, пропущено — {skipped}'
+    if errors:
+        msg += '. Замечания: ' + '; '.join(errors[:8])
+    flash(msg, 'ok')
     return redirect(url_for('journal_list', journal=journal))
 
 
