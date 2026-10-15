@@ -69,12 +69,13 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.3.1'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
+APP_VERSION = '1.3.2'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
 # 1.2.0 — поле «Примечание» во всех приказах + загрузка сотрудников и видов приказов из Excel
 # 1.2.1 — куратору разрешено редактирование справочника «Виды приказов»
 # 1.2.2 — панель загрузки приказов в журналы из Excel + подробное описание обновления программы
 # 1.3.0 — роль «Начальник отдела» + обновление без выключения сервера
 # 1.3.1 — отображение активных пользователей в меню (Администратор, Куратор, Начальник отдела)
+# 1.3.2 — фильтрация мусора от HTTPS-подключений к HTTP-порту в логах
 
 
 def setup_logging():
@@ -96,7 +97,39 @@ def setup_logging():
     return logger
 
 
+class _TlsNoiseFilter(logging.Filter):
+    """Фильтр для журнала Werkzeug: подавляет «мусорные» записи 400 Bad request
+    syntax/HTTP version, возникающие когда клиент обращается к HTTP-порту по
+    протоколу HTTPS (TLS Client Hello). Такие обращения не являются ошибками
+    приложения и только засоряют консоль и server.out.
+
+    Дополнительно фильтр помечает текущий запрос признаком TLS-мусора — этот
+    флаг использует log_request(), чтобы не писать такие обращения в файл
+    data/logs/app.log."""
+
+    def filter(self, record):
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        # Типичный признак: бинарные escape-последовательности \x16\x03\x01…
+        if '400' in msg and ('\\x16' in msg or '\\x03\\x01' in msg):
+            try:
+                g = getattr(_tls_noise_ctx, 'g', None)
+                if g is not None:
+                    g['tls_noise'] = True
+            except Exception:
+                pass
+            return False
+        return True
+
+
+# Хранилище контекста текущего запроса для фильтра (Flask app context 'g')
+_tls_noise_ctx = threading.local()
+
 log = setup_logging()
+# Подключаем фильтр к штатному логгеру Werkzeug (консольный вывод запросов)
+logging.getLogger('werkzeug').addFilter(_TlsNoiseFilter())
 
 
 def audit(action, details=''):
@@ -352,10 +385,50 @@ def get_active_users():
     return result
 
 
+def _looks_like_tls_handshake() -> bool:
+    """Признак TLS Client Hello, отправленного на HTTP-порт.
+
+    Браузер или сервис обращается по адресу https://, а приложение принимает
+    только http://. Werkzeug не может разобрать зашифрованный «запрос» и пишет
+    в консоль мусор с ошибкой 400 Bad request syntax. Функция позволяет
+    распознать такие обращения и отфильтровать их из журнала.
+
+    Источники признака (в порядке надёжности):
+    1) флаг 'tls_noise', который выставляет _TlsNoiseFilter при подавлении
+       мусорной записи werkzeug;
+    2) первый байт REQUEST_METHOD == 0x16 (TLS ContentType=handshake).
+    """
+    try:
+        if getattr(_tls_noise_ctx, 'g', None) and \
+                _tls_noise_ctx.g.get('tls_noise'):
+            return True
+        method = request.environ.get('REQUEST_METHOD', '')
+        first = method[:1] if isinstance(method, str) else b''
+        if isinstance(first, str):
+            first = first.encode('latin-1', 'ignore')[:1]
+        return first == b'\x16'  # ContentType=22 (handshake) в протоколе TLS
+    except Exception:
+        return False
+
+
+@app.before_request
+def _mark_tls_noise_context():
+    """Сохраняет ссылку на объект g текущего запроса в потокобезопасное
+    хранилище, чтобы фильтр журнала Werkzeug мог пометить TLS-мусор."""
+    try:
+        from flask import g as _fg
+        _tls_noise_ctx.g = _fg
+    except Exception:
+        pass
+
+
 @app.after_request
 def log_request(response):
     """Журнал логирования HTTP-запросов (каждый запрос)."""
     try:
+        # Пропускаем запись в файл логов мусора от HTTPS-подключений к HTTP-порту
+        if response.status_code == 400 and _looks_like_tls_handshake():
+            return response
         uid = session.get('user_id')
         status = response.status_code
         lvl = logging.WARNING if status >= 400 else logging.INFO
