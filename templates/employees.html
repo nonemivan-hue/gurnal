@@ -7,7 +7,7 @@
   <tr>
     <td>{{ r.full_name }}</td><td>{{ r.position }}</td>
     <td>{{ r.login or '—' }}</td><td>{{ r.role_name or '—' }}</td>
-    <td>{{ '✔ задан' if r.password_hash else '—' }}</td>
+    <td>{{ '✔ задан' if r.password_hash else '—' }}{% if r.password_hash and not r.pwd_changed_at %}<br><span class="muted">(не менялся)</span>{% endif %}</td>
     <td class="actions">
       <button class="btn sm" data-id="{{ r.id }}" data-fio="{{ r.full_name }}" data-pos="{{ r.position or '' }}"
               data-login="{{ r.login or '' }}" data-role="{{ r.role_name or 'Куратор' }}"

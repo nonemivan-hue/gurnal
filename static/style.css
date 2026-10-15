@@ -66,3 +66,5 @@ table.grid{width:100%;border-collapse:collapse;background:#fff;margin:14px 0;box
 .logline{white-space:pre-wrap;word-break:break-all;padding:1px 0;border-bottom:1px solid #1c2530}
 .logwarn{color:#f0c674}
 .logerr{color:#ff7b72;font-weight:bold}
+.flash.warn{background:#fff7e0;border:1px solid #e8cf8f;}
+.warn-note{color:#a06b00;background:#fff7e0;border:1px dashed #e8cf8f;padding:8px 10px;border-radius:6px;}

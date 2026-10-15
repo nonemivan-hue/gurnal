@@ -63,7 +63,7 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.0.0'
+APP_VERSION = '1.1.0'  # 1.1.0 — самостоятельная смена пароля сотрудником
 
 
 def setup_logging():
@@ -192,6 +192,7 @@ CREATE TABLE IF NOT EXISTS employees (
     position TEXT NOT NULL DEFAULT '',
     login TEXT UNIQUE,
     password_hash TEXT,
+    pwd_changed_at TEXT,           -- дата последней самостоятельной смены пароля
     role_id INTEGER REFERENCES roles(id)
 );
 CREATE TABLE IF NOT EXISTS order_types (
@@ -224,6 +225,10 @@ def init_db():
     os.makedirs(ARCHIVE_DIR, exist_ok=True)
     conn = get_db()
     conn.executescript(SCHEMA)
+    # Миграция: добавляем колонку pwd_changed_at в существующих базах
+    cols = [c['name'] for c in conn.execute('PRAGMA table_info(employees)')]
+    if 'pwd_changed_at' not in cols:
+        conn.execute('ALTER TABLE employees ADD COLUMN pwd_changed_at TEXT')
     # seed roles
     for r in ALL_ROLES:
         conn.execute('INSERT OR IGNORE INTO roles(name) VALUES (?)', (r,))
@@ -338,6 +343,10 @@ def login():
         conn.close()
         if u and check_password_hash(u['password_hash'], password):
             session['user_id'] = u['id']
+            # При входе показываем подсказку о смене пароля, если сотрудник
+            # ещё не менял пароль после его установки администратором.
+            if not u['pwd_changed_at']:
+                flash('Рекомендуем сменить пароль: перейдите в «Моя учётная запись».', 'warn')
             audit('ВХОД В СИСТЕМУ', f'роль: {u["role_name"]}')
             return redirect(url_for('index'))
         error = 'Неверный логин или пароль'
@@ -398,14 +407,18 @@ def employee_save():
             if not cur:
                 abort(404)
             pw_hash = cur['password_hash']
+            pwd_changed = cur['pwd_changed_at'] if 'pwd_changed_at' in cur.keys() else None
             if password:
+                # администратор установил новый пароль — счётчик смены обнуляется,
+                # сотруднику будет рекомендовано сменить его самостоятельно
                 pw_hash = generate_password_hash(password)
+                pwd_changed = None
             elif not login_name:
                 pw_hash = None
             conn.execute(
                 'UPDATE employees SET full_name=?, position=?, login=?, '
-                'password_hash=?, role_id=? WHERE id=?',
-                (full_name, position, login_name, pw_hash, role_id, eid))
+                'password_hash=?, pwd_changed_at=?, role_id=? WHERE id=?',
+                (full_name, position, login_name, pw_hash, pwd_changed, role_id, eid))
             audit('ИЗМЕНЁН СОТРУДНИК', f'id={eid}, {full_name}')
         else:
             pw_hash = generate_password_hash(password) if (login_name and password) else None
@@ -1105,26 +1118,39 @@ def service_update():
 
 @app.route('/profile', methods=['GET', 'POST'])
 def profile():
+    """Личная страница сотрудника: информация + самостоятельная смена пароля."""
     user = current_user()
     if request.method == 'POST':
         old = request.form.get('old_password', '')
         new = request.form.get('new_password', '')
+        confirm = request.form.get('confirm_password', '')
         conn = get_db()
         u = conn.execute('SELECT * FROM employees WHERE id=?', (user['id'],)).fetchone()
         if not u['password_hash'] or not check_password_hash(u['password_hash'], old):
             conn.close()
+            audit('ПАРОЛЬ НЕ ИЗМЕНЁН', 'неверно указан текущий пароль')
             flash('Текущий пароль указан неверно', 'err')
             return redirect(url_for('profile'))
         if len(new) < 4:
             conn.close()
             flash('Новый пароль слишком короткий (минимум 4 символа)', 'err')
             return redirect(url_for('profile'))
-        conn.execute('UPDATE employees SET password_hash=? WHERE id=?',
-                     (generate_password_hash(new), user['id']))
+        if new != confirm:
+            conn.close()
+            flash('Новый пароль и подтверждение не совпадают', 'err')
+            return redirect(url_for('profile'))
+        if new == old:
+            conn.close()
+            flash('Новый пароль не должен совпадать с текущим', 'err')
+            return redirect(url_for('profile'))
+        conn.execute(
+            'UPDATE employees SET password_hash=?, pwd_changed_at=? WHERE id=?',
+            (generate_password_hash(new),
+             datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
         conn.commit()
         conn.close()
-        audit('ПАРОЛЬ ИЗМЕНЁН', 'собственный профиль')
-        flash('Пароль изменён', 'ok')
+        audit('ПАРОЛЬ ИЗМЕНЁН', 'собственный профиль (сотрудник сменил пароль сам)')
+        flash('Пароль успешно изменён', 'ok')
         return redirect(url_for('profile'))
     return render_template('profile.html')
 
