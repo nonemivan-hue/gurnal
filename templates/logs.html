@@ -23,6 +23,19 @@
   <a class="btn sm" href="{{ url_for('logs_download', file='app.log') }}">⬇ Скачать app.log</a>
 </div>
 
+<div class="toolbar no-print" style="border-top:1px solid #ddd;padding-top:8px">
+  <form method="post" action="{{ url_for('logs_clear') }}" style="display:inline-flex;gap:8px;align-items:center"
+        onsubmit="return confirm('Очистить журнал логирования? Текущий файл app.log будет обрезан.');">
+    <strong>🧹 Очистка журнала:</strong>
+    <select name="mode">
+      <option value="keep">С копией: сохранить резервную копию и очистить</option>
+      <option value="backup">Только копия: создать резервную копию, не очищая</option>
+      <option value="full">Полная очистка: без копии, удалить и архивы ротации</option>
+    </select>
+    <button class="btn sm danger" type="submit">Очистить</button>
+  </form>
+</div>
+
 {% if files|length > 1 %}
 <div class="no-print" style="margin-bottom:10px">
   Архивные файлы журнала (ротация):

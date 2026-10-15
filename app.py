@@ -6,6 +6,7 @@
 """
 import os
 import io
+import re
 import ast
 import json
 import hashlib
@@ -69,13 +70,15 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.3.2'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
+APP_VERSION = '1.4.1'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
 # 1.2.0 — поле «Примечание» во всех приказах + загрузка сотрудников и видов приказов из Excel
 # 1.2.1 — куратору разрешено редактирование справочника «Виды приказов»
 # 1.2.2 — панель загрузки приказов в журналы из Excel + подробное описание обновления программы
 # 1.3.0 — роль «Начальник отдела» + обновление без выключения сервера
 # 1.3.1 — отображение активных пользователей в меню (Администратор, Куратор, Начальник отдела)
 # 1.3.2 — фильтрация мусора от HTTPS-подключений к HTTP-порту в логах
+# 1.4.0 — REST API v1 (/api/v1/...) + клиентское десктопное приложение client_app.py
+# 1.4.1 — очистка журнала логирования администратором (режимы: с копией / только копия / полная)
 
 
 def setup_logging():
@@ -132,9 +135,13 @@ log = setup_logging()
 logging.getLogger('werkzeug').addFilter(_TlsNoiseFilter())
 
 
-def audit(action, details=''):
-    """Запись события аудита в журнал логирования (кто и что сделал)."""
-    user = session.get('user_id')
+def audit(action, details='', user=None):
+    """Запись события аудита в журнал логирования (кто и что сделал).
+
+    user — необязательная строка с описанием пользователя (используется API,
+    где авторизация идёт по Basic-auth без cookie-сессии)."""
+    if user is None:
+        user = session.get('user_id')
     if user:
         try:
             conn = sqlite3.connect(DB_PATH)
@@ -625,6 +632,13 @@ def _guard():
     open_exceptions = ('login', 'logout', 'static')
     if request.endpoint in open_exceptions:
         return
+    # REST API v1 (клиентское приложение): авторизация Basic выполняется
+    # внутри самих api_*-обработчиков; публичный /api/v1/info открыт всем
+    ep = request.endpoint or ''
+    if request.path.startswith('/api/'):
+        if ep in ('api_info', 'api_user'):
+            return
+        return          # дальнейшие права проверяет обработчик (401 вместо редиректа)
     if not session.get('user_id'):
         return redirect(url_for('login'))
     # отмечаем сессию пользователя активной (для счётчика «онлайн» в меню)
@@ -1824,6 +1838,431 @@ def report_journal_print():
                            base_url=url_for('report_journal_print'),
                            extra_args={'journal': journal})
 
+# ============================================================================
+# REST API v1 — используется клиентским десктопным приложением (client_app.py).
+# Аутентификация: Basic (логин/пароль сотрудника) либо cookie-сессия веб-версии.
+# Все ответы — JSON в кодировке UTF-8. Права доступа идентичны веб-интерфейсу.
+# ============================================================================
+
+API_JOURNAL_FIELDS = ('order_number', 'order_date', 'order_type_id',
+                      'person_fio', 'specialist_fio', 'note')
+
+
+def api_user():
+    """Возвращает пользователя по Basic-auth или сессии; иначе 401."""
+    auth = request.authorization
+    if auth and auth.type == 'basic' and auth.username:
+        conn = get_db()
+        u = conn.execute('SELECT e.*, r.name role_name FROM employees e '
+                         'LEFT JOIN roles r ON r.id=e.role_id '
+                         'WHERE e.login=? AND e.password_hash IS NOT NULL',
+                         (auth.username,)).fetchone()
+        conn.close()
+        if u and check_password_hash(u['password_hash'], auth.password or ''):
+            return u
+        audit('НЕУДАЧНЫЙ ВХОД (API)', f'login={auth.username}')
+        abort(Response(json.dumps({'error': 'Неверный логин или пароль'},
+                                  ensure_ascii=False), status=401,
+                       mimetype='application/json'))
+    uid = session.get('user_id')
+    if uid:
+        u = current_user()
+        if u:
+            return u
+    abort(Response(json.dumps({'error': 'Требуется авторизация'},
+                              ensure_ascii=False), status=401,
+                   mimetype='application/json'))
+
+
+def api_json(obj, status=200):
+    return Response(json.dumps(obj, ensure_ascii=False, default=str),
+                    status=status, mimetype='application/json')
+
+
+def _order_row_to_dict(r):
+    return {'id': r['id'], 'journal': r['journal'],
+            'order_number': r['order_number'], 'order_date': r['order_date'],
+            'order_type_id': r['order_type_id'],
+            'order_type_name': r['type_name'] if 'type_name' in r.keys() else None,
+            'person_fio': r['person_fio'], 'specialist_fio': r['specialist_fio'],
+            'note': r['note'] if 'note' in r.keys() else '',
+            'has_scan': bool(r['scan_path']),
+            'created_at': r['created_at'] if 'created_at' in r.keys() else ''}
+
+
+@app.route('/api/v1/session')
+def api_session():
+    """Проверка учётных данных и прав для клиента: роль, журналы, отчёты."""
+    u = api_user()
+    journals = [{'key': j, 'title': JOURNAL_TITLES[j],
+                 'can_edit': can_access_journal(u, j)}
+                for j in JOURNAL_TYPES if can_access_journal(u, j)]
+    return api_json({'ok': True, 'id': u['id'], 'full_name': u['full_name'],
+                     'position': u['position'], 'role': u['role_name'],
+                     'journals': journals,
+                     'reports': can_view_reports(u),
+                     'employees_dir': can_edit_employees(u),
+                     'order_types_dir': can_edit_order_types(u),
+                     'version': APP_VERSION})
+
+
+@app.route('/api/v1/order_types', methods=['GET', 'POST'])
+def api_order_types():
+    u = api_user()
+    if request.method == 'POST':                      # добавление/изменение вида
+        if not can_edit_order_types(u):
+            abort(403)
+        data = request.get_json(silent=True) or {}
+        kind = (data.get('kind') or '').strip()
+        name = (data.get('name') or '').strip()
+        tid = data.get('id')
+        if kind not in JOURNAL_TYPES or not name:
+            return api_json({'error': 'Укажите журнал (вид приказа) и наименование'}, 400)
+        conn = get_db()
+        try:
+            if tid:
+                if not conn.execute('SELECT 1 FROM order_types WHERE id=?',
+                                    (int(tid),)).fetchone():
+                    conn.close(); abort(404)
+                dup = conn.execute(
+                    'SELECT 1 FROM order_types WHERE kind=? AND name=? AND id<>?',
+                    (kind, name, int(tid))).fetchone()
+                if dup:
+                    conn.close()
+                    return api_json({'error': 'Такой вид приказа уже существует'}, 400)
+                conn.execute('UPDATE order_types SET kind=?, name=? WHERE id=?',
+                             (kind, name, int(tid)))
+                action = 'ВИД ПРИКАЗА ИЗМЕНЁН (API)'
+            else:
+                dup = conn.execute('SELECT 1 FROM order_types WHERE kind=? AND name=?',
+                                   (kind, name)).fetchone()
+                if dup:
+                    conn.close()
+                    return api_json({'error': 'Такой вид приказа уже существует'}, 400)
+                conn.execute('INSERT INTO order_types(kind,name) VALUES (?,?)',
+                             (kind, name))
+                action = 'ВИД ПРИКАЗА СОХРАНЁН (API)'
+            conn.commit()
+        finally:
+            conn.close()
+        audit(action, f'{JOURNAL_TITLES.get(kind, kind)}: {name}',
+              user=f"{u['full_name']} ({u['login']})")
+        return api_json({'ok': True}, 201 if not tid else 200)
+    journal = request.args.get('journal')
+    conn = get_db()
+    if journal:
+        if journal not in JOURNAL_TYPES or not can_access_journal(u, journal):
+            conn.close(); abort(403)
+        rows = conn.execute('SELECT * FROM order_types WHERE kind=? ORDER BY name',
+                            (journal,)).fetchall()
+    else:
+        rows = conn.execute('SELECT * FROM order_types ORDER BY kind, name').fetchall()
+    conn.close()
+    return api_json([{'id': r['id'], 'kind': r['kind'],
+                      'kind_title': JOURNAL_TITLES.get(r['kind'], r['kind']),
+                      'name': r['name']} for r in rows])
+
+
+@app.route('/api/v1/order_types/<int:tid>', methods=['DELETE'])
+def api_order_type_delete(tid):
+    """Удаление вида приказа (куратор и выше); запрещено, если вид используется."""
+    u = api_user()
+    if not can_edit_order_types(u):
+        abort(403)
+    conn = get_db()
+    row = conn.execute('SELECT * FROM order_types WHERE id=?', (tid,)).fetchone()
+    if not row:
+        conn.close(); abort(404)
+    used = conn.execute('SELECT COUNT(*) c FROM orders WHERE order_type_id=?',
+                        (tid,)).fetchone()['c']
+    if used:
+        conn.close()
+        return api_json({'error': f'Вид используется в приказах ({used} шт.), '
+                                  'удаление запрещено'}, 400)
+    conn.execute('DELETE FROM order_types WHERE id=?', (tid,))
+    conn.commit(); conn.close()
+    audit('ВИД ПРИКАЗА УДАЛЁН (API)',
+          f'{JOURNAL_TITLES.get(row["kind"], row["kind"])}: {row["name"]}',
+          user=f"{u['full_name']} ({u['login']})")
+    return api_json({'ok': True})
+
+
+@app.route('/api/v1/journal/<journal>/orders')
+def api_orders(journal):
+    u = api_user()
+    if journal not in JOURNAL_TYPES or not can_access_journal(u, journal):
+        abort(403)
+    q = request.args.get('q', '').strip()
+    d1 = request.args.get('d1'); d2 = request.args.get('d2')
+    sql = ('SELECT o.*, t.name AS type_name FROM orders o '
+           'LEFT JOIN order_types t ON t.id=o.order_type_id WHERE o.journal=?')
+    params = [journal]
+    if q:
+        sql += (' AND (o.order_number LIKE ? OR o.person_fio LIKE ? '
+                'OR o.specialist_fio LIKE ? OR o.note LIKE ?)')
+        params += [f'%{q}%'] * 4
+    if d1:
+        sql += ' AND o.order_date>=?'; params.append(d1)
+    if d2:
+        sql += ' AND o.order_date<=?'; params.append(d2)
+    sql += ' ORDER BY o.order_date DESC, o.order_number DESC'
+    conn = get_db()
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return api_json([_order_row_to_dict(r) for r in rows])
+
+
+@app.route('/api/v1/journal/<journal>/orders', methods=['POST'])
+def api_order_create(journal):
+    u = api_user()
+    if journal not in JOURNAL_TYPES or not can_access_journal(u, journal):
+        abort(403)
+    data = request.get_json(silent=True) or {}
+    conn = get_db()
+    order_number = (data.get('order_number') or '').strip() \
+        or next_order_number(conn, journal)
+    base = order_number.split('-')[0]
+    if base.isdigit():
+        conn.execute('UPDATE counters SET value=MAX(value,?) WHERE journal=?',
+                     (int(base), journal))
+    order_date = (data.get('order_date') or '').strip() or date.today().isoformat()
+    type_id = data.get('order_type_id')
+    if type_id:
+        ok = conn.execute('SELECT 1 FROM order_types WHERE id=? AND kind=?',
+                          (int(type_id), journal)).fetchone()
+        type_id = int(type_id) if ok else None
+    cur = conn.execute(
+        'INSERT INTO orders(journal, order_number, order_date, order_type_id, '
+        'person_fio, specialist_fio, note) VALUES (?,?,?,?,?,?,?)',
+        (journal, order_number, order_date, type_id,
+         (data.get('person_fio') or '').strip(),
+         (data.get('specialist_fio') or '').strip(),
+         (data.get('note') or '').strip()))
+    conn.commit()
+    oid = cur.lastrowid
+    conn.close()
+    audit('ПРИКАЗ СОЗДАН (API)',
+          f'журнал={JOURNAL_TITLES.get(journal)}, №={order_number}, по кому='
+          f"{data.get('person_fio', '')}", user=f"{u['full_name']} ({u['login']})")
+    return api_json({'ok': True, 'id': oid, 'order_number': order_number}, 201)
+
+
+@app.route('/api/v1/orders/<int:oid>', methods=['GET', 'PUT', 'DELETE'])
+def api_order_item(oid):
+    u = api_user()
+    conn = get_db()
+    row = conn.execute('SELECT * FROM orders WHERE id=?', (oid,)).fetchone()
+    if not row:
+        conn.close(); abort(404)
+    journal = row['journal']
+    if not can_access_journal(u, journal):
+        conn.close(); abort(403)
+    if request.method == 'GET':
+        full = conn.execute('SELECT o.*, t.name AS type_name FROM orders o '
+                            'LEFT JOIN order_types t ON t.id=o.order_type_id '
+                            'WHERE o.id=?', (oid,)).fetchone()
+        conn.close()
+        return api_json(_order_row_to_dict(full))
+    if request.method == 'DELETE':
+        if row['scan_path'] and os.path.exists(os.path.join(UPLOAD_DIR, row['scan_path'])):
+            os.remove(os.path.join(UPLOAD_DIR, row['scan_path']))
+        conn.execute('DELETE FROM orders WHERE id=?', (oid,))
+        conn.commit(); conn.close()
+        audit('ПРИКАЗ УДАЛЁН (API)', f'id={oid}, №={row["order_number"]}', user=f"{u['full_name']} ({u['login']})")
+        return api_json({'ok': True})
+    # PUT — частичное обновление разрешённых полей
+    data = request.get_json(silent=True) or {}
+    upd = dict(row)
+    for f in API_JOURNAL_FIELDS:
+        if f in data:
+            upd[f] = (data[f] or '').strip() if isinstance(data[f], str) else data[f]
+    if upd['order_type_id']:
+        ok = conn.execute('SELECT 1 FROM order_types WHERE id=? AND kind=?',
+                          (int(upd['order_type_id']), journal)).fetchone()
+        if not ok:
+            upd['order_type_id'] = None
+    conn.execute('UPDATE orders SET order_number=?, order_date=?, order_type_id=?, '
+                 'person_fio=?, specialist_fio=?, note=? WHERE id=?',
+                 (upd['order_number'], upd['order_date'], upd['order_type_id'],
+                  upd['person_fio'], upd['specialist_fio'], upd['note'], oid))
+    conn.commit(); conn.close()
+    audit('ПРИКАЗ ИЗМЕНЁН (API)', f'id={oid}, №={upd["order_number"]}', user=f"{u['full_name']} ({u['login']})")
+    return api_json({'ok': True})
+
+
+@app.route('/api/v1/orders/<int:oid>/scan', methods=['GET', 'POST', 'DELETE'])
+def api_order_scan(oid):
+    u = api_user()
+    conn = get_db()
+    row = conn.execute('SELECT * FROM orders WHERE id=?', (oid,)).fetchone()
+    if not row:
+        conn.close(); abort(404)
+    if not can_access_journal(u, row['journal']):
+        conn.close(); abort(403)
+    if request.method == 'GET':
+        if not row['scan_path']:
+            conn.close(); abort(404)
+        path = os.path.join(UPLOAD_DIR, os.path.basename(row['scan_path']))
+        conn.close()
+        if not os.path.exists(path):
+            abort(404)
+        return send_file(path, mimetype='application/pdf',
+                         as_attachment=request.args.get('download') == '1',
+                         download_name=f"скан_{row['order_number']}.pdf")
+    if request.method == 'DELETE':
+        if row['scan_path'] and os.path.exists(os.path.join(UPLOAD_DIR, row['scan_path'])):
+            os.remove(os.path.join(UPLOAD_DIR, row['scan_path']))
+        conn.execute('UPDATE orders SET scan_path=NULL WHERE id=?', (oid,))
+        conn.commit(); conn.close()
+        audit('СКАН УДАЛЁН (API)', f'id={oid}', user=f"{u['full_name']} ({u['login']})")
+        return api_json({'ok': True})
+    # POST — загрузка скана (multipart: file=...); принимается только PDF
+    f = request.files.get('file')
+    if not f or not f.filename:
+        conn.close()
+        return api_json({'error': 'Файл не передан (поле file)'}, 400)
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext != '.pdf':
+        conn.close()
+        audit('ОТКАЗ: СКАН НЕ В ФОРМАТЕ PDF (API)', f.filename, user=f"{u['full_name']} ({u['login']})")
+        return api_json({'error': 'Скан должен быть в формате PDF'}, 400)
+    fname = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(f.filename)}"
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    f.save(os.path.join(UPLOAD_DIR, fname))
+    if row['scan_path'] and os.path.exists(os.path.join(UPLOAD_DIR, row['scan_path'])):
+        os.remove(os.path.join(UPLOAD_DIR, row['scan_path']))
+    conn.execute('UPDATE orders SET scan_path=? WHERE id=?', (fname, oid))
+    conn.commit(); conn.close()
+    audit('СКАН ЗАГРУЖЕН (API)', f'id={oid}, файл={fname}', user=f"{u['full_name']} ({u['login']})")
+    return api_json({'ok': True, 'scan': fname}, 201)
+
+
+@app.route('/api/v1/reports/by_period')
+def api_report_by_period():
+    u = api_user()
+    if not can_view_reports(u):
+        abort(403)
+    d1, d2 = _report_period()
+    agg = {}
+    for r in _query_report_rows(d1, d2):
+        agg[r['journal']] = agg.get(r['journal'], 0) + 1
+    return api_json({'d1': d1, 'd2': d2,
+                     'rows': [{'kind': JOURNAL_TITLES[j], 'count': agg.get(j, 0)}
+                              for j in JOURNAL_TYPES],
+                     'total': sum(agg.values())})
+
+
+@app.route('/api/v1/reports/by_period_detail')
+def api_report_by_period_detail():
+    u = api_user()
+    if not can_view_reports(u):
+        abort(403)
+    d1, d2 = _report_period()
+    matrix, cols = {}, set()
+    for r in _query_report_rows(d1, d2):
+        kind = JOURNAL_TITLES[r['journal']]
+        name = r['type_name'] or '(не указан)'
+        cols.add(name)
+        matrix.setdefault(kind, {})
+        matrix[kind][name] = matrix[kind].get(name, 0) + 1
+    cols = sorted(cols)
+    table = [[kind] + [matrix[kind].get(c, 0) for c in cols]
+             for kind in [JOURNAL_TITLES[j] for j in JOURNAL_TYPES] if kind in matrix]
+    totals = [sum(row[i] for row in table) for i in range(1, len(cols) + 1)] if table else []
+    return api_json({'d1': d1, 'd2': d2, 'cols': cols, 'table': table,
+                     'totals': totals})
+
+
+@app.route('/api/v1/reports/journal_print')
+def api_report_journal_print():
+    u = api_user()
+    if not can_view_reports(u):
+        abort(403)
+    journal = request.args.get('journal', 'opeka')
+    if journal not in JOURNAL_TYPES:
+        abort(404)
+    d1, d2 = _report_period()
+    rows = _query_report_rows(d1, d2, journal=journal)
+    data = []
+    for i, r in enumerate(rows, 1):
+        name = r['type_name'] or ''
+        note = r['note'] if 'note' in r.keys() else ''
+        disp = (f'{name} ({r["person_fio"]})' if journal == 'opeka' else name)
+        if note:
+            disp = f'{disp}. Прим.: {note}' if disp else f'Прим.: {note}'
+        data.append({'n': i, 'number': r['order_number'], 'date': r['order_date'],
+                     'fio': r['person_fio'], 'name': disp,
+                     'specialist': r['specialist_fio']})
+    return api_json({'d1': d1, 'd2': d2, 'journal': journal,
+                     'title': f'Журнал «{JOURNAL_TITLES[journal]}» за период',
+                     'rows': data, 'total': len(data)})
+
+
+@app.route('/api/v1/employees')
+def api_employees():
+    u = api_user()
+    conn = get_db()
+    rows = conn.execute('SELECT e.*, r.name role_name FROM employees e '
+                        'LEFT JOIN roles r ON r.id=e.role_id '
+                        'ORDER BY e.full_name').fetchall()
+    conn.close()
+    # список сотрудников виден всем вошедшим (используется в журналах как подсказка),
+    # но пароли/логины — только тем, кто может редактировать справочник
+    out = []
+    for r in rows:
+        item = {'id': r['id'], 'full_name': r['full_name'],
+                'position': r['position'], 'role': r['role_name']}
+        if can_edit_employees(u):
+            item['login'] = r['login']
+        out.append(item)
+    return api_json(out)
+
+
+@app.route('/api/v1/info')
+def api_info():
+    """Публичная информация о сервере (без авторизации)."""
+    conn = get_db()
+    counts = {JOURNAL_TITLES[j]: conn.execute(
+        'SELECT COUNT(*) c FROM orders WHERE journal=?', (j,)).fetchone()['c']
+        for j in JOURNAL_TYPES}
+    conn.close()
+    return api_json({'app': 'Журнал регистрации приказов', 'version': APP_VERSION,
+                     'orders': counts})
+
+
+@app.route('/api/v1/password', methods=['POST'])
+def api_change_password():
+    """Самостоятельная смена пароля сотрудником (используется клиентом)."""
+    u = api_user()
+    data = request.get_json(silent=True) or {}
+    old = data.get('old_password') or ''
+    new = data.get('new_password') or ''
+    confirm = data.get('confirm_password') or ''
+    conn = get_db()
+    row = conn.execute('SELECT * FROM employees WHERE id=?', (u['id'],)).fetchone()
+    if not row['password_hash'] or not check_password_hash(row['password_hash'], old):
+        conn.close()
+        audit('ПАРОЛЬ НЕ ИЗМЕНЁН (API)', 'неверно указан текущий пароль',
+              user=f"{u['full_name']} ({u['login']})")
+        return api_json({'error': 'Текущий пароль указан неверно'}, 400)
+    if len(new) < 4:
+        conn.close()
+        return api_json({'error': 'Новый пароль слишком короткий (минимум 4 символа)'}, 400)
+    if new != confirm:
+        conn.close()
+        return api_json({'error': 'Новый пароль и подтверждение не совпадают'}, 400)
+    if new == old:
+        conn.close()
+        return api_json({'error': 'Новый пароль не должен совпадать с текущим'}, 400)
+    conn.execute('UPDATE employees SET password_hash=?, pwd_changed_at=? WHERE id=?',
+                 (generate_password_hash(new),
+                  datetime.now().strftime('%Y-%m-%d %H:%M:%S'), u['id']))
+    conn.commit()
+    conn.close()
+    audit('ПАРОЛЬ ИЗМЕНЁН (API)', 'клиентское приложение',
+          user=f"{u['full_name']} ({u['login']})")
+    return api_json({'ok': True})
+
 # ---------------------------------------------------------------- export helpers
 
 def _mem_download(stream, mimetype, filename):
@@ -2326,6 +2765,88 @@ def logs_download():
     if not os.path.isfile(p):
         abort(404)
     return send_file(p, as_attachment=True, download_name=name)
+
+
+@app.route('/logs/clear', methods=['POST'])
+def logs_clear():
+    """Очистка журнала логирования — только Администратор.
+
+    Режимы (параметр mode):
+      keep   — создать резервную копию app.log.<дата_время>, затем очистить
+               текущий файл и удалить архивные файлы ротации (по умолчанию);
+      backup — только создать резервную копию, ничего не удаляя;
+      full   — полностью очистить текущий файл и удалить все архивные
+               файлы ротации (без создания копии).
+
+    Перед очисткой в журнал записывается событие аудита, которое вместе с
+    копией попадает в резервный файл — след действия администратора теряется.
+    """
+    if not is_admin():
+        abort(403)
+    mode = request.form.get('mode', 'keep')
+    audit('ЖУРНАЛ ОЧИЩАЕТСЯ', f'режим: {mode}')
+
+    # 1. Резервная копия текущего файла журнала (если он существует)
+    copied = None
+    if mode in ('keep', 'backup') and os.path.isfile(LOG_FILE):
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        copied = os.path.join(LOG_DIR, f'app.log.{ts}.bak')
+        try:
+            with open(LOG_FILE, encoding='utf-8', errors='replace') as src, \
+                    open(copied, 'w', encoding='utf-8') as dst:
+                dst.write(src.read())
+        except OSError as e:
+            flash(f'Ошибка создания резервной копии журнала: {e}', 'err')
+            return redirect(url_for('logs_view'))
+
+    # 2. Удаляем архивные файлы ротации (app.log.1 … app.log.5)
+    removed = 0
+    if mode in ('keep', 'full'):
+        for fn in sorted(os.listdir(LOG_DIR)):
+            if re.fullmatch(r'app\.log\.\d+', fn):
+                try:
+                    os.remove(os.path.join(LOG_DIR, fn))
+                    removed += 1
+                except OSError:
+                    pass
+
+    # 3. Обрезаем основной файл «на лету» (без остановки сервера).
+    #    Файл открываем на запись с усечением; потоковый handler продолжает
+    #    писать в тот же файловый дескриптор, поэтому после truncate нужно
+    #    принудительно выставить позицию записи в начало, иначе следующая
+    #    строка лога появится на прежнем смещении («дырка» из нулей).
+    if mode in ('keep', 'full'):
+        try:
+            for h in logging.getLogger('orders_app').handlers:
+                if isinstance(h, RotatingFileHandler):
+                    h.stream.flush()
+                    os.truncate(LOG_FILE, 0)
+                    h.stream.seek(0)
+                    break
+            else:
+                with open(LOG_FILE, 'w', encoding='utf-8'):
+                    pass
+        except OSError as e:
+            flash(f'Ошибка очистки файла журнала: {e}', 'err')
+            return redirect(url_for('logs_view'))
+
+    log.info(f'[АУДИТ] ЖУРНАЛ ОЧИЩЕН пользователем id='
+                f"{session.get('user_id')} (IP: {request.remote_addr}); "
+                f"режим: {mode}; "
+                f"копия: {os.path.basename(copied) if copied else 'нет'}; "
+                f"удалено архивов ротации: {removed}")
+
+    if mode == 'backup':
+        flash(f'Резервная копия журнала создана: '
+              f'{os.path.basename(copied)} (файл app.log сохранён)', 'ok')
+    elif copied:
+        flash(f'Журнал очищен. Резервная копия: '
+              f'{os.path.basename(copied)}; удалено архивных файлов: {removed}',
+              'ok')
+    else:
+        flash(f'Журнал полностью очищен (удалено архивных файлов: {removed})',
+              'ok')
+    return redirect(url_for('logs_view'))
 
 
 if __name__ == '__main__':
