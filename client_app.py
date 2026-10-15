@@ -140,7 +140,439 @@ def check_server(base_url):
         raise
 
 
-# ================================================================== окно входа
+# ================================================== графический интерфейс (Tkinter)
+def _build_gui_classes():
+    """Возвращает классы GUI, определённые только при наличии Tkinter."""
+    if not HAS_TK:
+        raise RuntimeError('Tkinter недоступен — используйте режим --cli')
+
+    # ------------------------------------------------------------- окно входа
+    class LoginWindow(tk.Tk):
+        """Диалог подключения: адрес сервера, логин, пароль + проверка сервера."""
+
+        def __init__(self, server=''):
+            super().__init__()
+            self.title('Вход — Журнал приказов (клиент)')
+            self.result = None                      # (client, session) после успеха
+            self.resizable(False, False)
+            frm = ttk.Frame(self, padding=14)
+            frm.grid(sticky='nsew')
+            ttk.Label(frm, text='Журнал регистрации приказов',
+                      font=('Segoe UI', 13, 'bold')).grid(
+                column=0, columnspan=3, row=0, pady=(0, 10))
+            ttk.Label(frm, text='Сервер:').grid(row=1, column=0, sticky='w')
+            self.e_srv = ttk.Entry(frm, width=38)
+            self.e_srv.grid(row=1, column=1, columnspan=2, sticky='we', pady=2)
+            self.e_srv.insert(0, server or 'http://localhost:8080')
+            ttk.Button(frm, text='Проверить', command=self.ping).grid(
+                row=1, column=3, padx=(6, 0))
+            ttk.Label(frm, text='Логин:').grid(row=2, column=0, sticky='w')
+            self.e_login = ttk.Entry(frm, width=38)
+            self.e_login.grid(row=2, column=1, columnspan=2, sticky='we', pady=2)
+            ttk.Label(frm, text='Пароль:').grid(row=3, column=0, sticky='w')
+            self.e_pwd = ttk.Entry(frm, width=38, show='*')
+            self.e_pwd.grid(row=3, column=1, columnspan=2, sticky='we', pady=2)
+            self.lbl_info = ttk.Label(frm, text='', foreground='#555', wraplength=380)
+            self.lbl_info.grid(row=4, column=0, columnspan=4, sticky='w', pady=(4, 0))
+            btns = ttk.Frame(frm)
+            btns.grid(row=5, column=0, columnspan=4, pady=(12, 0))
+            ttk.Button(btns, text='Войти', command=self.do_login).pack(side='left', padx=4)
+            ttk.Button(btns, text='Отмена', command=self.destroy).pack(side='left', padx=4)
+            self.e_pwd.bind('<Return>', lambda e: self.do_login())
+            self.e_login.bind('<Return>', lambda e: self.do_login())
+            self.bind('<Escape>', lambda e: self.destroy())
+
+        def ping(self):
+            try:
+                info = check_server(self.e_srv.get().strip())
+                ver = info.get('version', '?')
+                self.lbl_info.config(text=f'Сервер доступен (v{ver})', foreground='#0a7d28')
+            except ApiError as e:
+                self.lbl_info.config(text=str(e), foreground='#b00020')
+
+        def do_login(self):
+            base = self.e_srv.get().strip()
+            login = self.e_login.get().strip()
+            pwd = self.e_pwd.get()
+            if not base or not login:
+                messagebox.showwarning('Вход', 'Укажите адрес сервера и логин')
+                return
+            try:
+                client = ServerClient(base, login, pwd)
+                sess = client.get('/api/v1/session')
+                self.result = (client, sess)
+                self.destroy()
+            except ApiError as e:
+                messagebox.showerror('Ошибка входа', str(e))
+
+    # ------------------------------------------------------- диалог приказа
+    class OrderDialog(tk.Toplevel):
+        """Форма создания/редактирования приказа (данные — из REST API)."""
+
+        FIELDS = (('order_number', '№ приказа (пусто = авто)'),
+                  ('order_date', 'Дата приказа (ГГГГ-ММ-ДД)'),
+                  ('person_fio', 'Ф.И.О. в отношении кого'),
+                  ('specialist_fio', 'ФИО специалиста'),
+                  ('note', 'Примечание'))
+
+        def __init__(self, master, client, journal_key, order=None):
+            super().__init__(master)
+            self.client = client
+            self.journal_key = journal_key
+            self.saved = None                       # dict приказа после сохранения
+            self.title('Приказ — изменение' if order else 'Приказ — создание')
+            self.resizable(False, False)
+            frm = ttk.Frame(self, padding=12)
+            frm.grid(sticky='nsew')
+            self.vars = {}
+            row = 0
+            for f, label in self.FIELDS:
+                ttk.Label(frm, text=label + ':').grid(row=row, column=0, sticky='w')
+                v = tk.StringVar(value=(order or {}).get(f, '') or
+                                 (date.today().isoformat() if f == 'order_date' and not order else ''))
+                ttk.Entry(frm, textvariable=v, width=46).grid(
+                    row=row, column=1, sticky='we', pady=2)
+                self.vars[f] = v
+                row += 1
+            # выбор вида приказа из справочника (по журналу)
+            ttk.Label(frm, text='Наименование приказа:').grid(row=row, column=0, sticky='w')
+            self.cbo_type = ttk.Combobox(frm, width=44, state='readonly')
+            self.cbo_type.grid(row=row, column=1, sticky='we', pady=2)
+            row += 1
+            self.types = []
+            try:
+                self.types = client.get(f'/api/v1/order_types?journal={journal_key}')
+                names = ['— без вида —'] + [t['name'] for t in self.types]
+                self.cbo_type['values'] = names
+                sel = 0
+                if order and order.get('order_type_id'):
+                    for i, t in enumerate(self.types, 1):
+                        if t['id'] == order['order_type_id']:
+                            sel = i
+                self.cbo_type.current(sel)
+            except ApiError as e:
+                messagebox.showerror('Справочник', str(e))
+            btns = ttk.Frame(frm)
+            btns.grid(row=row, column=0, columnspan=2, pady=(12, 0))
+            ttk.Button(btns, text='Сохранить', command=self.save).pack(side='left', padx=4)
+            ttk.Button(btns, text='Отмена', command=self.destroy).pack(side='left', padx=4)
+
+        def save(self):
+            data = {f: v.get().strip() for f, v in self.vars.items()}
+            idx = self.cbo_type.current()
+            data['order_type_id'] = self.types[idx - 1]['id'] if idx > 0 else None
+            try:
+                if self.master_order_id:
+                    self.saved = self.client.put(f"/api/v1/orders/{self.master_order_id}", data)
+                else:
+                    self.saved = self.client.post(
+                        f'/api/v1/journal/{self.journal_key}/orders', data)
+                self.destroy()
+            except ApiError as e:
+                messagebox.showerror('Сохранение', str(e))
+
+        @property
+        def master_order_id(self):
+            return getattr(self, '_oid', None)
+
+    # ------------------------------------------------------------ главное окно
+    class AppWindow(tk.Tk):
+        """Основное окно: журнал слева, карточка приказа справа, панель действий."""
+
+        def __init__(self, client, sess):
+            super().__init__()
+            self.client = client
+            self.sess = sess
+            # 'journals' — список {key, title, can_edit} от сервера (права по роли)
+            self.journals = {j['title']: j for j in sess['journals']}
+            self.rows = []                          # текущий список приказов
+            self.can_edit = True                    # роль с доступом к журналу
+            self.title(f"Журнал приказов — {sess['full_name']} ({sess['role']})")
+            self.geometry('980x600')
+            self._build_ui()
+            if self.journals:
+                self.cbo_journal.current(0)
+                self.reload()
+
+        # ---------- построение интерфейса ----------
+        def _build_ui(self):
+            top = ttk.Frame(self, padding=6)
+            top.pack(fill='x')
+            ttk.Label(top, text='Журнал:').pack(side='left')
+            self.cbo_journal = ttk.Combobox(top, width=22, state='readonly',
+                                            values=list(self.journals))
+            self.cbo_journal.pack(side='left', padx=4)
+            self.cbo_journal.bind('<<ComboboxSelected>>', lambda e: self.reload())
+            self.e_search = ttk.Entry(top, width=30)
+            self.e_search.pack(side='left', padx=4)
+            self.e_search.bind('<Return>', lambda e: self.reload())
+            ttk.Button(top, text='Обновить', command=self.reload).pack(side='left', padx=2)
+            ttk.Button(top, text='Поиск', command=self.reload).pack(side='left', padx=2)
+
+            body = ttk.Frame(self)
+            body.pack(fill='both', expand=True, padx=6, pady=2)
+            cols = ('order_number', 'order_date', 'type', 'person', 'spec', 'scan', 'note')
+            heads = {'order_number': '№', 'order_date': 'Дата', 'type': 'Вид приказа',
+                     'person': 'Ф.И.О.', 'spec': 'Специалист', 'scan': 'Скан', 'note': 'Примечание'}
+            widths = {'order_number': 70, 'order_date': 90, 'type': 220, 'person': 240,
+                      'spec': 200, 'scan': 50, 'note': 200}
+            self.tree = ttk.Treeview(body, columns=cols, show='tree headings', height=16)
+            for c in cols:
+                self.tree.heading(c, text=heads[c])
+                self.tree.column(c, width=widths[c], anchor='w')
+            vsb = ttk.Scrollbar(body, orient='vertical', command=self.tree.yview)
+            self.tree.configure(yscrollcommand=vsb.set)
+            self.tree.pack(side='left', fill='both', expand=True)
+            vsb.pack(side='left', fill='y')
+            self.tree.bind('<Double-1>', lambda e: self.edit_selected())
+
+            bar = ttk.Frame(self, padding=6)
+            bar.pack(fill='x')
+            if self.can_edit:
+                ttk.Button(bar, text='➕ Создать', command=self.create).pack(side='left', padx=2)
+                ttk.Button(bar, text='✏️ Изменить', command=self.edit_selected).pack(side='left', padx=2)
+                ttk.Button(bar, text='🗑 Удалить', command=self.delete_selected).pack(side='left', padx=2)
+            ttk.Button(bar, text='📎 Скан…', command=self.scan_menu).pack(side='left', padx=2)
+            ttk.Button(bar, text='📊 Отчёты', command=self.reports).pack(side='left', padx=2)
+            ttk.Button(bar, text='🔑 Сменить пароль', command=self.change_password).pack(side='left', padx=2)
+            ttk.Button(bar, text='Выход', command=self.destroy).pack(side='right', padx=2)
+            self.lbl_status = ttk.Label(self, text='', padding=(8, 4), foreground='#555')
+            self.lbl_status.pack(fill='x')
+
+        # ---------- данные ----------
+        def current_journal(self):
+            """Ключ (key) выбранного журнала из ответа сервера."""
+            j = self.journals.get(self.cbo_journal.get())
+            return j['key'] if j else None
+
+        def journal_can_edit(self):
+            """Право редактирования текущего журнала — по данным сервера."""
+            j = self.journals.get(self.cbo_journal.get())
+            return bool(j and j.get('can_edit'))
+
+        def reload(self):
+            jk = self.current_journal()
+            if not jk:
+                return
+            q = self.e_search.get().strip()
+            url = f'/api/v1/journal/{jk}/orders'
+            if q:
+                url += '?q=' + urllib.parse.quote(q)
+            try:
+                self.rows = self.client.get(url)
+            except ApiError as e:
+                messagebox.showerror('Журнал', str(e))
+                return
+            self.tree.delete(*self.tree.get_children())
+            for r in self.rows:
+                self.tree.insert('', 'end', iid=str(r['id']), values=(
+                    r['order_number'], r['order_date'], r['order_type_name'] or '',
+                    r['person_fio'], r['specialist_fio'],
+                    'есть' if r['has_scan'] else '', r.get('note') or ''))
+            self.lbl_status.config(text=f'{self.cbo_journal.get()}: {len(self.rows)} записей')
+
+        def selected_id(self):
+            sel = self.tree.selection()
+            if not sel:
+                messagebox.showinfo('Выбор', 'Выделите приказ в списке')
+                return None
+            return int(sel[0])
+
+        def _find_row(self, oid):
+            return next((r for r in self.rows if r['id'] == oid), None)
+
+        # ---------- действия ----------
+        def create(self):
+            dlg = OrderDialog(self, self.client, self.current_journal())
+            self.wait_window(dlg)
+            if dlg.saved:
+                self.reload()
+
+        def edit_selected(self):
+            oid = self.selected_id()
+            if not oid:
+                return
+            try:
+                order = self.client.get(f'/api/v1/orders/{oid}')
+            except ApiError as e:
+                messagebox.showerror('Приказ', str(e))
+                return
+            dlg = OrderDialog(self, self.client, order['journal'], order)
+            dlg._oid = oid
+            self.wait_window(dlg)
+            if dlg.saved:
+                self.reload()
+
+        def delete_selected(self):
+            oid = self.selected_id()
+            if not oid:
+                return
+            r = self._find_row(oid)
+            num = r['order_number'] if r else str(oid)
+            if not messagebox.askyesno('Удаление', f'Удалить приказ № {num}?'):
+                return
+            try:
+                self.client.delete(f'/api/v1/orders/{oid}')
+                self.reload()
+            except ApiError as e:
+                messagebox.showerror('Удаление', str(e))
+
+        def scan_menu(self):
+            oid = self.selected_id()
+            if not oid:
+                return
+            choice = messagebox.askyesno(
+                'Скан PDF', 'Да — скачать существующий скан\nНет — выбрать и загрузить PDF')
+            if choice:
+                out = filedialog.asksaveasfilename(defaultextension='.pdf',
+                                                   filetypes=[('PDF', '*.pdf')])
+                if not out:
+                    return
+                try:
+                    payload, _ = self.client.get_raw(f'/api/v1/orders/{oid}/scan')
+                    with open(out, 'wb') as fh:
+                        fh.write(payload)
+                    messagebox.showinfo('Скан', f'Сохранён: {out}')
+                except ApiError as e:
+                    messagebox.showerror('Скан', str(e))
+            else:
+                path = filedialog.askopenfilename(filetypes=[('PDF', '*.pdf')])
+                if not path:
+                    return
+                try:
+                    with open(path, 'rb') as fh:
+                        content = fh.read()
+                    self.client.post(f'/api/v1/orders/{oid}/scan', files=[
+                        ('file', os.path.basename(path), content)])
+                    self.reload()
+                    messagebox.showinfo('Скан', 'Загружен (только PDF)')
+                except ApiError as e:
+                    messagebox.showerror('Скан', str(e))
+
+        def change_password(self):
+            old = simpledialog.askstring('Пароль', 'Текущий пароль:', show='*', parent=self)
+            new = simpledialog.askstring('Пароль', 'Новый пароль:', show='*', parent=self)
+            if not old or not new:
+                return
+            try:
+                self.client.post('/api/v1/password', {
+                    'old_password': old, 'new_password': new, 'confirm_password': new})
+                messagebox.showinfo('Пароль', 'Пароль изменён')
+            except ApiError as e:
+                messagebox.showerror('Пароль', str(e))
+
+        # ---------- отчёты ----------
+        def reports(self):
+            win = ReportsWindow(self, self.client, self.sess)
+            win.grab_set()
+
+    # ---------------------------------------------------------- окно отчётов
+    def _normalize_report(t, data):
+        """Нормализация ответа сервера к виду (заголовок, шапка, строки).
+
+        Сервер возвращает разные форматы для трёх отчётов — приводим их
+        к единому табличному виду для вывода и экспорта в CSV.
+        Возвращает: (title, headers, rows, total)
+        """
+        title = data.get('title', t)
+        if t == 'by_period':                       # rows: [{'kind','count'}]
+            headers = ['Вид приказа', 'Кол-во приказов']
+            rows = [[r['kind'], str(r['count'])] for r in data.get('rows', [])]
+            return title, headers, rows, data.get('total')
+        if t == 'by_period_matrix':                # cols + table + totals
+            headers = ['Вид приказа'] + list(data.get('cols', []))
+            rows = [[str(c) for c in row] for row in data.get('table', [])]
+            if data.get('totals'):
+                rows.append(['ИТОГО'] + [str(x) for x in data['totals']])
+            return title, headers, rows, None
+        # journal_print: rows dict
+        headers = ['№ п/п', '№ приказа', 'Дата', 'Ф.И.О.',
+                   'Наименование приказа', 'ФИО специалиста']
+        rows = [[str(r['n']), r['number'], r['date'], r['fio'],
+                 r['name'], r['specialist']] for r in data.get('rows', [])]
+        return title, headers, rows, data.get('total')
+
+    class ReportsWindow(tk.Toplevel):
+        """Выбор периода и типа отчёта; вывод таблицей; сохранение в CSV."""
+
+        TYPES = (('by_period', 'Приказы за период'),
+                 ('by_period_matrix', 'Приказы за период с расшифровкой'),
+                 ('journal_print', 'Распечатка журнала за период'))
+
+        def __init__(self, master, client, sess):
+            super().__init__(master)
+            self.client = client
+            self.title('Отчёты')
+            self.geometry('860x520')
+            top = ttk.Frame(self, padding=8)
+            top.pack(fill='x')
+            ttk.Label(top, text='С:').pack(side='left')
+            self.d1 = ttk.Entry(top, width=12)
+            self.d1.pack(side='left', padx=2)
+            self.d1.insert(0, date.today().replace(day=1).isoformat())
+            ttk.Label(top, text='По:').pack(side='left')
+            self.d2 = ttk.Entry(top, width=12)
+            self.d2.pack(side='left', padx=2)
+            self.d2.insert(0, date.today().isoformat())
+            self.var_type = tk.StringVar(value=self.TYPES[0][0])
+            for key, title in self.TYPES:
+                ttk.Radiobutton(top, text=title, variable=self.var_type,
+                                value=key).pack(side='left', padx=6)
+            self.cbo_j = ttk.Combobox(top, width=16, state='readonly',
+                                      values=list(sess['journals'] and
+                                                 [j['title'] for j in sess['journals']] or []))
+            self.cbo_j.pack(side='left', padx=4)
+            if sess['journals']:
+                self.cbo_j.current(0)
+            ttk.Button(top, text='Построить', command=self.build).pack(side='left', padx=6)
+            ttk.Button(top, text='Сохранить CSV', command=self.export_csv).pack(side='left')
+            self.txt = tk.Text(self, font=('Consolas', 10))
+            self.txt.pack(fill='both', expand=True, padx=8, pady=6)
+            self.headers, self.rows_data = [], []
+
+        def build(self):
+            """Запрос отчёта к REST API сервера и вывод таблицей."""
+            qs = f'?d1={self.d1.get().strip()}&d2={self.d2.get().strip()}'
+            t = self.var_type.get()
+            try:
+                if t == 'journal_print':
+                    jk = {j['title']: j['key'] for j in self.master.sess['journals']}
+                    data = self.client.get(
+                        '/api/v1/reports/journal_print' + qs +
+                        '&journal=' + urllib.parse.quote(jk[self.cbo_j.get()]))
+                elif t == 'by_period_matrix':
+                    data = self.client.get('/api/v1/reports/by_period_detail' + qs)
+                else:
+                    data = self.client.get('/api/v1/reports/by_period' + qs)
+            except ApiError as e:
+                messagebox.showerror('Отчёт', str(e))
+                return
+            title, self.headers, self.rows_data, total = _normalize_report(t, data)
+            self.txt.delete('1.0', 'end')
+            self.txt.insert('end', f"Отчёт «{title}»\n")
+            self.txt.insert('end', f"Период: {data.get('d1')} — {data.get('d2')}\n\n")
+            self.txt.insert('end', _table(self.rows_data, self.headers) + '\n')
+            if total is not None:
+                self.txt.insert('end', f"\nИтого приказов: {total}\n")
+
+        def export_csv(self):
+            if not self.rows_data:
+                messagebox.showinfo('CSV', 'Сначала постройте отчёт')
+                return
+            path = filedialog.asksaveasfilename(defaultextension='.csv',
+                                                filetypes=[('CSV', '*.csv')])
+            if not path:
+                return
+            with open(path, 'w', newline='', encoding='utf-8-sig') as fh:
+                w = csv.writer(fh, delimiter=';')
+                if self.headers:
+                    w.writerow(self.headers)
+                for r in self.rows_data:
+                    w.writerow(r if isinstance(r, list) else [r])
+            messagebox.showinfo('CSV', f'Сохранено: {path}')
+
+    return LoginWindow, OrderDialog, AppWindow
+
 
 # ==================================================================== CLI-режим
 def _pad(s, w):
@@ -278,6 +710,16 @@ def cli_main(base, login, password):
                 print(_table([[r['kind'], r['count']] for r in data['rows']]
                              + [['ИТОГО', data['total']]],
                              ['Вид приказа', 'Кол-во']))
+            elif op == 'm':
+                d1 = input('С [первый день месяца]: ').strip()
+                d2 = input('По [сегодня]: ').strip()
+                qs = f'?d1={d1 or date.today().replace(day=1)}&d2={d2 or date.today()}'
+                data = c.get('/api/v1/reports/by_period_detail' + qs)
+                heads = ['Вид приказа'] + data['cols']
+                rows = [[str(x) for x in row] for row in data['table']]
+                if data.get('totals'):
+                    rows.append(['ИТОГО'] + [str(x) for x in data['totals']])
+                print(_table(rows, heads))
             elif op == 'w':
                 rows = c.get('/api/v1/employees')
                 print(_table([[r['full_name'], r['position'], r['role']]
