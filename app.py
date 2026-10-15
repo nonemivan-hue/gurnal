@@ -8,13 +8,17 @@ import os
 import io
 import json
 import shutil
+import socket
 import sqlite3
+import logging
 import tempfile
+import traceback
+from logging.handlers import RotatingFileHandler
 from datetime import date, datetime
 
 from flask import (
     Flask, render_template, request, redirect, url_for, session, flash,
-    send_file, abort, Response
+    send_file, abort, Response, g
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -38,8 +42,77 @@ DB_PATH = os.path.join(BASE_DIR, 'data', 'orders.db')
 UPLOAD_DIR = os.path.join(BASE_DIR, 'data', 'scans')
 ARCHIVE_DIR = os.path.join(BASE_DIR, 'data', 'archives')
 VERSION_FILE = os.path.join(BASE_DIR, 'data', 'version.json')
+LOG_DIR = os.path.join(BASE_DIR, 'data', 'logs')
+LOG_FILE = os.path.join(LOG_DIR, 'app.log')
 
-APP_VERSION = '1.0.0'
+# Порт по умолчанию изменён на 8080, т.к. на сервере порт 5000 уже занят
+# другой программой. Порт можно переопределить переменной окружения PORT
+# или параметром командной строки: python3 app.py --port 8090
+DEFAULT_PORT = 8080
+
+
+def find_free_port(start):
+    """Возвращает первый свободный TCP-порт, начиная с start (для 0.0.0.0)."""
+    for port in range(start, start + 100):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind(('0.0.0.0', port))
+                return port
+            except OSError:
+                continue
+    return None
+
+APP_VERSION = '1.1.0'  # 1.1.0 — самостоятельная смена пароля сотрудником
+
+
+def setup_logging():
+    """Настройка журнала логирования: файл data/logs/app.log с ротацией
+    (5 файлов по 2 МБ) + вывод в консоль."""
+    os.makedirs(LOG_DIR, exist_ok=True)
+    logger = logging.getLogger('orders_app')
+    if not logger.handlers:
+        logger.setLevel(logging.INFO)
+        fmt = logging.Formatter(
+            '%(asctime)s | %(levelname)-8s | %(message)s', '%Y-%m-%d %H:%M:%S')
+        fh = RotatingFileHandler(LOG_FILE, maxBytes=2_000_000,
+                                 backupCount=5, encoding='utf-8')
+        fh.setFormatter(fmt)
+        logger.addHandler(fh)
+        sh = logging.StreamHandler()
+        sh.setFormatter(fmt)
+        logger.addHandler(sh)
+    return logger
+
+
+log = setup_logging()
+
+
+def audit(action, details=''):
+    """Запись события аудита в журнал логирования (кто и что сделал)."""
+    user = session.get('user_id')
+    if user:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            r = conn.execute('SELECT full_name, login FROM employees '
+                             'WHERE id=?', (user,)).fetchone()
+            conn.close()
+            who = f'{r["full_name"]} ({r["login"]})' if r else f'id={user}'
+        except Exception:
+            who = f'id={user}'
+    else:
+        who = 'не авторизован'
+    ip = request.remote_addr if has_request_context_safe() else '-'
+    log.info(f'[АУДИТ] {action} | пользователь: {who} | IP: {ip} | {details}')
+
+
+def has_request_context_safe():
+    try:
+        from flask import has_request_context
+        return has_request_context()
+    except Exception:
+        return False
 
 JOURNAL_TYPES = ['opeka', 'nuzhdaemost', 'profilaktika']
 JOURNAL_TITLES = {
@@ -76,6 +149,29 @@ def _load_or_create_secret():
 
 app.secret_key = _load_or_create_secret()
 
+
+@app.after_request
+def log_request(response):
+    """Журнал логирования HTTP-запросов (каждый запрос)."""
+    try:
+        uid = session.get('user_id')
+        status = response.status_code
+        lvl = logging.WARNING if status >= 400 else logging.INFO
+        # Ошибки доступа (403) и 404 пишем отдельной строкой для аудита
+        log.log(lvl, f'[HTTP] {request.method} {request.path} -> {status} '
+                     f'(IP: {request.remote_addr}, user_id: {uid or "-"})')
+        if status == 403:
+            audit('ОТКАЗ В ДОСТУПЕ (403)', f'{request.method} {request.path}')
+        # Неудачные попытки входа пишем в журнал отдельно
+        if (request.endpoint == 'login' and request.method == 'POST'
+                and status == 200):
+            log.warning(f'[БЕЗОПАСНОСТЬ] Неудачная попытка входа: логин '
+                        f"'{request.form.get('login','')}' от IP "
+                        f"{request.remote_addr}")
+    except Exception:
+        pass
+    return response
+
 # ---------------------------------------------------------------- DB helpers
 
 def get_db():
@@ -96,6 +192,7 @@ CREATE TABLE IF NOT EXISTS employees (
     position TEXT NOT NULL DEFAULT '',
     login TEXT UNIQUE,
     password_hash TEXT,
+    pwd_changed_at TEXT,           -- дата последней самостоятельной смены пароля
     role_id INTEGER REFERENCES roles(id)
 );
 CREATE TABLE IF NOT EXISTS order_types (
@@ -128,6 +225,10 @@ def init_db():
     os.makedirs(ARCHIVE_DIR, exist_ok=True)
     conn = get_db()
     conn.executescript(SCHEMA)
+    # Миграция: добавляем колонку pwd_changed_at в существующих базах
+    cols = [c['name'] for c in conn.execute('PRAGMA table_info(employees)')]
+    if 'pwd_changed_at' not in cols:
+        conn.execute('ALTER TABLE employees ADD COLUMN pwd_changed_at TEXT')
     # seed roles
     for r in ALL_ROLES:
         conn.execute('INSERT OR IGNORE INTO roles(name) VALUES (?)', (r,))
@@ -242,6 +343,11 @@ def login():
         conn.close()
         if u and check_password_hash(u['password_hash'], password):
             session['user_id'] = u['id']
+            # При входе показываем подсказку о смене пароля, если сотрудник
+            # ещё не менял пароль после его установки администратором.
+            if not u['pwd_changed_at']:
+                flash('Рекомендуем сменить пароль: перейдите в «Моя учётная запись».', 'warn')
+            audit('ВХОД В СИСТЕМУ', f'роль: {u["role_name"]}')
             return redirect(url_for('index'))
         error = 'Неверный логин или пароль'
     if session.get('user_id'):
@@ -251,6 +357,7 @@ def login():
 
 @app.route('/logout')
 def logout():
+    audit('ВЫХОД ИЗ СИСТЕМЫ')
     session.clear()
     return redirect(url_for('login'))
 
@@ -300,14 +407,19 @@ def employee_save():
             if not cur:
                 abort(404)
             pw_hash = cur['password_hash']
+            pwd_changed = cur['pwd_changed_at'] if 'pwd_changed_at' in cur.keys() else None
             if password:
+                # администратор установил новый пароль — счётчик смены обнуляется,
+                # сотруднику будет рекомендовано сменить его самостоятельно
                 pw_hash = generate_password_hash(password)
+                pwd_changed = None
             elif not login_name:
                 pw_hash = None
             conn.execute(
                 'UPDATE employees SET full_name=?, position=?, login=?, '
-                'password_hash=?, role_id=? WHERE id=?',
-                (full_name, position, login_name, pw_hash, role_id, eid))
+                'password_hash=?, pwd_changed_at=?, role_id=? WHERE id=?',
+                (full_name, position, login_name, pw_hash, pwd_changed, role_id, eid))
+            audit('ИЗМЕНЁН СОТРУДНИК', f'id={eid}, {full_name}')
         else:
             pw_hash = generate_password_hash(password) if (login_name and password) else None
             conn.execute(
@@ -315,9 +427,11 @@ def employee_save():
                 'VALUES (?,?,?,?,?)',
                 (full_name, position, login_name, pw_hash, role_id))
         conn.commit()
+        audit('СОТРУДНИК СОХРАНЁН', full_name)
         flash('Сотрудник сохранён', 'ok')
     except sqlite3.IntegrityError:
         conn.rollback()
+        audit('ОШИБКА СОХРАНЕНИЯ СОТРУДНИКА', f'занятый логин: {login_name}')
         flash('Ошибка: такой логин уже используется', 'err')
     finally:
         conn.close()
@@ -337,6 +451,7 @@ def employee_delete(eid):
     conn.execute('DELETE FROM employees WHERE id=?', (eid,))
     conn.commit()
     conn.close()
+    audit('СОТРУДНИК УДАЛЁН', f'id={eid}')
     flash('Сотрудник удалён', 'ok')
     return redirect(url_for('employees'))
 
@@ -369,9 +484,11 @@ def order_type_save():
         else:
             conn.execute('INSERT INTO order_types(kind,name) VALUES (?,?)', (kind, name))
         conn.commit()
+        audit('ВИД ПРИКАЗА СОХРАНЁН', f'{journal}: {name}')
         flash('Вид приказа сохранён', 'ok')
     except sqlite3.IntegrityError:
         conn.rollback()
+        audit('ОШИБКА: ДУБЛЬ ВИДА ПРИКАЗА', f'{journal}: {name}')
         flash('Такой вид приказа уже существует', 'err')
     finally:
         conn.close()
@@ -391,6 +508,7 @@ def order_type_delete(tid):
         conn.execute('DELETE FROM order_types WHERE id=?', (tid,))
         conn.commit()
         conn.close()
+        audit('ВИД ПРИКАЗА УДАЛЁН', f'id={tid}')
         flash('Удалено', 'ok')
     return redirect(url_for('order_types'))
 
@@ -477,6 +595,7 @@ def journal_create(journal):
         ext = os.path.splitext(f.filename)[1].lower()
         if ext != '.pdf':
             conn.close()
+            audit('ОТКАЗ: СКАН НЕ В ФОРМАТЕ PDF', f.filename)
             flash('Скан должен быть в формате PDF', 'err')
             return redirect(url_for('journal_list', journal=journal))
         fname = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(f.filename)}"
@@ -489,6 +608,7 @@ def journal_create(journal):
         (journal, order_number, order_date, type_id, person_fio, specialist_fio, scan_rel))
     conn.commit()
     conn.close()
+    audit('ПРИКАЗ СОЗДАН', f'журнал={JOURNAL_TITLES.get(journal)}, №={order_number}, по кому={person_fio}')
     flash('Приказ создан', 'ok')
     return redirect(url_for('journal_list', journal=journal))
 
@@ -515,6 +635,7 @@ def order_update(oid):
         ext = os.path.splitext(f.filename)[1].lower()
         if ext != '.pdf':
             conn.close()
+            audit('ОТКАЗ: СКАН НЕ В ФОРМАТЕ PDF', f.filename)
             flash('Скан должен быть в формате PDF', 'err')
             return redirect(url_for('journal_list', journal=journal))
         fname = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(f.filename)}"
@@ -529,6 +650,7 @@ def order_update(oid):
         (order_number, order_date, type_id, person_fio, specialist_fio, scan_rel, oid))
     conn.commit()
     conn.close()
+    audit('ПРИКАЗ ИЗМЕНЁН', f'id={oid}')
     flash('Изменения сохранены', 'ok')
     return redirect(url_for('journal_list', journal=journal))
 
@@ -549,6 +671,7 @@ def order_delete(oid):
     conn.execute('DELETE FROM orders WHERE id=?', (oid,))
     conn.commit()
     conn.close()
+    audit('ПРИКАЗ УДАЛЁН', f'id={oid}')
     flash('Приказ удалён', 'ok')
     return redirect(url_for('journal_list', journal=journal))
 
@@ -871,6 +994,7 @@ def service_backup():
         zpath = os.path.join(ARCHIVE_DIR, zipname)
         os.makedirs(ARCHIVE_DIR, exist_ok=True)
         shutil.make_archive(zpath[:-4], 'zip', tmp)
+        audit('РЕЗЕРВНАЯ КОПИЯ СОЗДАНА', zipname)
         flash(f'Архив создан: {zipname}', 'ok')
     except Exception as e:
         flash(f'Ошибка создания архива: {e}', 'err')
@@ -896,6 +1020,7 @@ def service_delete_archive(name):
     p = os.path.join(ARCHIVE_DIR, os.path.basename(name))
     if os.path.exists(p):
         os.remove(p)
+        audit('АРХИВ УДАЛЁН', name)
         flash('Архив удалён', 'ok')
     return redirect(url_for('service'))
 
@@ -939,6 +1064,7 @@ def service_restore():
             if os.path.isdir(UPLOAD_DIR):
                 shutil.rmtree(UPLOAD_DIR)
             shutil.copytree(scans_in, UPLOAD_DIR)
+        audit('ВОССТАНОВЛЕНИЕ ИЗ АРХИВА', f.filename)
         flash('База данных восстановлена из архива', 'ok')
     except Exception as e:
         flash(f'Ошибка восстановления: {e}', 'err')
@@ -979,6 +1105,7 @@ def service_update():
                 shutil.copy2(srcf, dstf)
                 applied += 1
         write_version_file()
+        audit('ОБНОВЛЕНИЕ ПРОГРАММЫ ПРИМЕНЕНО', f'файлов: {applied}')
         flash(f'Обновление применено: файлов — {applied}. Перезапустите сервер при необходимости.',
               'ok')
     except Exception as e:
@@ -991,25 +1118,39 @@ def service_update():
 
 @app.route('/profile', methods=['GET', 'POST'])
 def profile():
+    """Личная страница сотрудника: информация + самостоятельная смена пароля."""
     user = current_user()
     if request.method == 'POST':
         old = request.form.get('old_password', '')
         new = request.form.get('new_password', '')
+        confirm = request.form.get('confirm_password', '')
         conn = get_db()
         u = conn.execute('SELECT * FROM employees WHERE id=?', (user['id'],)).fetchone()
         if not u['password_hash'] or not check_password_hash(u['password_hash'], old):
             conn.close()
+            audit('ПАРОЛЬ НЕ ИЗМЕНЁН', 'неверно указан текущий пароль')
             flash('Текущий пароль указан неверно', 'err')
             return redirect(url_for('profile'))
         if len(new) < 4:
             conn.close()
             flash('Новый пароль слишком короткий (минимум 4 символа)', 'err')
             return redirect(url_for('profile'))
-        conn.execute('UPDATE employees SET password_hash=? WHERE id=?',
-                     (generate_password_hash(new), user['id']))
+        if new != confirm:
+            conn.close()
+            flash('Новый пароль и подтверждение не совпадают', 'err')
+            return redirect(url_for('profile'))
+        if new == old:
+            conn.close()
+            flash('Новый пароль не должен совпадать с текущим', 'err')
+            return redirect(url_for('profile'))
+        conn.execute(
+            'UPDATE employees SET password_hash=?, pwd_changed_at=? WHERE id=?',
+            (generate_password_hash(new),
+             datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
         conn.commit()
         conn.close()
-        flash('Пароль изменён', 'ok')
+        audit('ПАРОЛЬ ИЗМЕНЁН', 'собственный профиль (сотрудник сменил пароль сам)')
+        flash('Пароль успешно изменён', 'ok')
         return redirect(url_for('profile'))
     return render_template('profile.html')
 
@@ -1024,7 +1165,91 @@ def err404(e):
     return render_template('error.html', code=404, msg='Страница не найдена.'), 404
 
 
+@app.errorhandler(Exception)
+def err500(e):
+    """Любое необработанное исключение пишется в журнал логирования."""
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        return e  # 403/404 и т.п. отдаём штатными обработчиками
+    log.error(f'НЕОБРАБОТАННАЯ ОШИБКА при {request.method} {request.path}: '
+              f'{e}\n{traceback.format_exc()}')
+    return render_template('error.html', code=500,
+                           msg='Внутренняя ошибка сервера. Подробности — в журнале логов.'), 500
+
+# ------------------------------------------------------------- просмотр логов
+
+LOG_TAIL_MAX = 2000  # максимум строк, выводимых на страницу журнала
+
+
+def _read_log_tail(n):
+    """Читает последние n строк основного файла лога (с учётом ротации)."""
+    try:
+        with open(LOG_FILE, encoding='utf-8', errors='replace') as f:
+            lines = f.readlines()[-n:]
+        return [l.rstrip('\n') for l in lines]
+    except FileNotFoundError:
+        return []
+
+
+@app.route('/logs')
+def logs_view():
+    """Просмотр журнала логирования — только Администратор."""
+    if not is_admin():
+        abort(403)
+    try:
+        n = min(int(request.args.get('n', 200)), LOG_TAIL_MAX)
+    except ValueError:
+        n = 200
+    lines = _read_log_tail(n)
+    files = sorted([fn for fn in os.listdir(LOG_DIR) if fn.startswith('app.log')]
+                   ) if os.path.isdir(LOG_DIR) else []
+    return render_template('logs.html', lines=lines, n=n, files=files,
+                           log_file=LOG_FILE)
+
+
+@app.route('/logs/download')
+def logs_download():
+    """Скачивание файла журнала — только Администратор."""
+    if not is_admin():
+        abort(403)
+    name = os.path.basename(request.args.get('file', 'app.log'))
+    p = os.path.join(LOG_DIR, name)
+    if not os.path.isfile(p):
+        abort(404)
+    return send_file(p, as_attachment=True, download_name=name)
+
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    print(f'Сервер запущен: http://0.0.0.0:{port}  (логин: admin / admin)')
-    app.run(host='0.0.0.0', port=port, debug=False)
+    import sys
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = None
+    # Порт можно задать: аргументом --port, переменной окружения PORT
+    # или значением по умолчанию DEFAULT_PORT (8080, т.к. 5000 занят другой
+    # программой на этом сервере). Если порт занят — автоматически
+    # подбирается ближайший свободный.
+    args = sys.argv[1:]
+    if '--port' in args:
+        try:
+            port = int(args[args.index('--port') + 1])
+        except (IndexError, ValueError):
+            print('Неверное значение --port'); sys.exit(1)
+    elif os.environ.get('PORT'):
+        port = int(os.environ['PORT'])
+    else:
+        port = DEFAULT_PORT
+    requested_port = port
+    port = find_free_port(port)
+    if port is None:
+        print(f'Не найден свободный порт начиная с {requested_port}. '
+              f'Запустите с другим портом: python3 app.py --port <порт>')
+        sys.exit(1)
+    if port != requested_port:
+        print(f'Порт {requested_port} занят другой программой, '
+              f'использую свободный порт {port}')
+        log.warning(f'Запрошенный порт {requested_port} занят, '
+                    f'приложение запущено на порту {port}')
+    log.info(f'Сервер запущен: http://{host}:{port} '
+             f'(версия {APP_VERSION}, логи: {LOG_FILE})')
+    print(f'Сервер запущен: http://{host}:{port}  (логин: admin / admin)')
+    print(f'Журнал логирования: {LOG_FILE}')
+    app.run(host=host, port=port, debug=False)
