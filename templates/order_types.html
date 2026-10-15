@@ -2,6 +2,16 @@
 {% block content %}
 <h1>Справочник «Виды приказов»</h1>
 {% if cu and cu.role_name=='Администратор' %}
+<div class="panel no-print">
+  <h2>📥 Загрузка из Excel</h2>
+  <p class="muted">Формат файла .xlsx: первая строка — заголовки «Вид приказа», «Наименование приказа».
+     Вид приказа указывается названием журнала: Опека / Нуждаемость / Профилактика. Дубликаты пропускаются.</p>
+  <form method="post" action="{{ url_for('order_types_import') }}" enctype="multipart/form-data" style="display:inline">
+    <input type="file" name="file" accept=".xlsx" required>
+    <button class="btn primary" type="submit">Импортировать</button>
+  </form>
+  <a class="btn" href="{{ url_for('order_types_template') }}">⬇ Скачать шаблон Excel</a>
+</div>
 <div class="panel">
   <h2 id="otTitle">Новый вид приказа</h2>
   <form method="post" action="{{ url_for('order_type_save') }}" id="otForm">

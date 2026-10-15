@@ -1,6 +1,5 @@
-nohup: ignoring input
 OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
-2026-10-15 09:16:45 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.1.1, логи: /workspace/data/logs/app.log)
+2026-10-15 09:32:14 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.2.0, логи: /workspace/data/logs/app.log)
 Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
 Журнал логирования: /workspace/data/logs/app.log
  * Serving Flask app 'app'
@@ -10,25 +9,27 @@ WARNING: This is a development server. Do not use it in a production deployment.
  * Running on http://127.0.0.1:8080
  * Running on http://21.0.4.143:8080
 Press CTRL+C to quit
-2026-10-15 09:16:48 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
-127.0.0.1 - - [15/Oct/2026 09:16:48] "GET /login HTTP/1.1" 200 -
-2026-10-15 09:17:00 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
-2026-10-15 09:17:00 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
-127.0.0.1 - - [15/Oct/2026 09:17:00] "POST /login HTTP/1.1" 302 -
-2026-10-15 09:17:00 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
-127.0.0.1 - - [15/Oct/2026 09:17:00] "GET / HTTP/1.1" 200 -
-2026-10-15 09:17:00 | INFO     | [АУДИТ] ВИД ПРИКАЗА СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | Нуждаемость: ФИНАЛЬНЫЙ ТЕСТ
-2026-10-15 09:17:00 | INFO     | [HTTP] POST /order_types/save -> 302 (IP: 127.0.0.1, user_id: 1)
-127.0.0.1 - - [15/Oct/2026 09:17:00] "POST /order_types/save HTTP/1.1" 302 -
-2026-10-15 09:17:00 | INFO     | [HTTP] GET /order_types -> 200 (IP: 127.0.0.1, user_id: 1)
-127.0.0.1 - - [15/Oct/2026 09:17:00] "GET /order_types HTTP/1.1" 200 -
-2026-10-15 09:17:04 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
-2026-10-15 09:17:04 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
-127.0.0.1 - - [15/Oct/2026 09:17:04] "POST /login HTTP/1.1" 302 -
-2026-10-15 09:17:04 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
-127.0.0.1 - - [15/Oct/2026 09:17:04] "GET / HTTP/1.1" 200 -
-2026-10-15 09:17:04 | INFO     | [АУДИТ] ВИД ПРИКАЗА УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=12
-2026-10-15 09:17:04 | INFO     | [HTTP] POST /order_types/delete/12 -> 302 (IP: 127.0.0.1, user_id: 1)
-127.0.0.1 - - [15/Oct/2026 09:17:04] "POST /order_types/delete/12 HTTP/1.1" 302 -
-2026-10-15 09:17:04 | INFO     | [HTTP] GET /order_types -> 200 (IP: 127.0.0.1, user_id: 1)
-127.0.0.1 - - [15/Oct/2026 09:17:04] "GET /order_types HTTP/1.1" 200 -
+2026-10-15 09:32:45 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 09:32:45 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 09:32:45] "POST /login HTTP/1.1" 302 -
+2026-10-15 09:32:45 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 09:32:45] "GET / HTTP/1.1" 200 -
+2026-10-15 09:32:45 | INFO     | [HTTP] GET /employees/template -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 09:32:45] "GET /employees/template HTTP/1.1" 200 -
+2026-10-15 09:32:45 | INFO     | [HTTP] GET /order_types/template -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 09:32:45] "GET /order_types/template HTTP/1.1" 200 -
+2026-10-15 09:32:46 | INFO     | [АУДИТ] ИМПОРТ СОТРУДНИКОВ ИЗ EXCEL | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | файл=emps.xlsx, создано=2, обновлено=0, пропущено=0
+2026-10-15 09:32:46 | INFO     | [HTTP] POST /employees/import -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 09:32:46] "POST /employees/import HTTP/1.1" 302 -
+2026-10-15 09:32:46 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 09:32:46] "GET /employees HTTP/1.1" 200 -
+2026-10-15 09:32:46 | INFO     | [АУДИТ] ИМПОРТ СОТРУДНИКОВ ИЗ EXCEL | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | файл=emps2.xlsx, создано=0, обновлено=1, пропущено=0
+2026-10-15 09:32:46 | INFO     | [HTTP] POST /employees/import -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 09:32:46] "POST /employees/import HTTP/1.1" 302 -
+2026-10-15 09:32:46 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 09:32:46] "GET /employees HTTP/1.1" 200 -
+2026-10-15 09:32:46 | INFO     | [АУДИТ] ИМПОРТ ВИДОВ ПРИКАЗОВ ИЗ EXCEL | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | файл=types.xlsx, создано=3, пропущено=1
+2026-10-15 09:32:46 | INFO     | [HTTP] POST /order_types/import -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 09:32:46] "POST /order_types/import HTTP/1.1" 302 -
+2026-10-15 09:32:46 | INFO     | [HTTP] GET /order_types -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 09:32:46] "GET /order_types HTTP/1.1" 200 -
