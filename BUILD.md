@@ -4,7 +4,7 @@
 «Журнал регистрации приказов по видам деятельности» в самостоятельные
 исполняемые файлы (без установленного Python на целевом компьютере) с помощью
 PyInstaller. Готовые сборки различаются для Windows и ALT Linux — **собирать
-нужно на той ОС, под которую intended запуск** (кросс-сборки PyInstaller не
+нужно на той ОС, под которую планируется запуск** (кросс-сборки PyInstaller не
 поддерживает).
 
 Состав сборки:
@@ -18,6 +18,29 @@ PyInstaller. Готовые сборки различаются для Windows �
 (база, сканы, логи, архивы) создаётся автоматически рядом с бинарником сервера
 при первом запуске; при переносе между платформами достаточно скопировать его
 целиком (см. раздел 5).
+
+---
+
+## 0. Краткая инструкция (для опытных)
+
+**Windows** (из каталога проекта, в `cmd` или PowerShell):
+
+```bat
+py -m pip install -r requirements.txt pyinstaller
+py -m PyInstaller --noconfirm build.spec
+dist\orders_server.exe
+```
+
+**ALT Linux** (из каталога проекта):
+
+```sh
+pip3 install -r requirements.txt pyinstaller   # либо apt-get, см. п. 1.2
+python3 -m PyInstaller --noconfirm build.spec
+./dist/orders_server
+```
+
+Результат — в каталоге `dist/`: `orders_server(.exe)` и `orders_client(.exe)`.
+Подробности подготовки, запуска, автозапуска и переноса данных — далее.
 
 ---
 
