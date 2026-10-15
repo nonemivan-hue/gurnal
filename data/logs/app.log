@@ -315,3 +315,6 @@
 2026-10-15 10:08:58 | WARNING  | [HTTP] POST /employees/save -> 403 (IP: 127.0.0.1, user_id: 11)
 2026-10-15 10:08:58 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: Тест Тест Профилактика (test_role_3) | IP: 127.0.0.1 | POST /employees/save
 2026-10-15 10:09:02 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 10:44:40 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 10:45:41 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 10:45:50 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)

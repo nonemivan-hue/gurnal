@@ -21,6 +21,18 @@
   </form>
 </div>
 
+<div class="panel no-print">
+  <h2>📥 Загрузка приказов из Excel</h2>
+  <p class="hint">Файл .xlsx: первая строка — заголовки. Столбцы «№ приказа» и «Дата приказа» необязательны
+     (номер присвоится автоматически с суффиксом журнала, дата будет текущей). Дубликаты пропускаются;
+     сканы PDF после импорта прикладываются к приказам вручную.</p>
+  <form method="post" action="{{ url_for('journal_import', journal=journal) }}" enctype="multipart/form-data">
+    <label>Файл Excel (.xlsx) <input type="file" name="file" accept=".xlsx" required></label>
+    <button class="btn primary" type="submit">Импортировать</button>
+    <a class="btn" href="{{ url_for('journal_template', journal=journal) }}">⬇ Скачать шаблон</a>
+  </form>
+</div>
+
 <form method="get" class="searchbar no-print">
   <input name="q" value="{{ q }}" placeholder="Поиск по номеру / ФИО…">
   <button class="btn">Найти</button>

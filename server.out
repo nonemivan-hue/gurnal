@@ -119,3 +119,9 @@ Press CTRL+C to quit
 127.0.0.1 - - [15/Oct/2026 10:08:58] "POST /employees/save HTTP/1.1" 403 -
 2026-10-15 10:09:02 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
 127.0.0.1 - - [15/Oct/2026 10:09:02] "GET /login HTTP/1.1" 200 -
+2026-10-15 10:44:40 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 10:44:40] "GET /login HTTP/1.1" 200 -
+2026-10-15 10:45:41 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 10:45:41] "GET /login HTTP/1.1" 200 -
+2026-10-15 10:45:50 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 10:45:50] "GET /login HTTP/1.1" 200 -
