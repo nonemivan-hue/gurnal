@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1>Справочник «Сотрудники»</h1>
-{% if cu and cu.role_name=='Администратор' %}
+{% if cu and cu.role_name in ['Администратор','Начальник отдела'] %}
 <div class="panel no-print">
   <h2>📥 Загрузка из Excel</h2>
   <p class="muted">Формат файла .xlsx: первая строка — заголовки «ФИО сотрудника», «Должность», «Роль», «Логин», «Пароль».

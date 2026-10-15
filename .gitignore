@@ -1,2 +1,6 @@
+__pycache__/
+*.pyc
+data/logs/
 *.log
-*.out
+server.out
+data/app.pid

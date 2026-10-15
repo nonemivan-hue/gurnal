@@ -12,6 +12,8 @@ import socket
 import sqlite3
 import logging
 import tempfile
+import threading
+import time
 import traceback
 from logging.handlers import RotatingFileHandler
 from datetime import date, datetime
@@ -64,7 +66,7 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.2.2'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
+APP_VERSION = '1.3.0'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
 # 1.2.0 — поле «Примечание» во всех приказах + загрузка сотрудников и видов приказов из Excel
 # 1.2.1 — куратору разрешено редактирование справочника «Виды приказов»
 # 1.2.2 — панель загрузки приказов в журналы из Excel + подробное описание обновления программы
@@ -129,12 +131,17 @@ JOURNAL_SUFFIX = {
     'nuzhdaemost': '-ну',
     'profilaktika': '-пр',
 }
+# Роль «Начальник отдела» добавлена в каждую группу доступа — она имеет
+# доступ ко всем журналам, всем отчётам и всем справочникам (версия 1.3.0).
 ROLE_ACCESS = {
-    'opeka': ('Администратор', 'Куратор', 'Опека'),
-    'nuzhdaemost': ('Администратор', 'Куратор', 'Нуждаемость'),
-    'profilaktika': ('Администратор', 'Куратор', 'Профилактика'),
+    'opeka': ('Администратор', 'Куратор', 'Начальник отдела', 'Опека'),
+    'nuzhdaemost': ('Администратор', 'Куратор', 'Начальник отдела', 'Нуждаемость'),
+    'profilaktika': ('Администратор', 'Куратор', 'Начальник отдела', 'Профилактика'),
 }
-ALL_ROLES = ['Администратор', 'Куратор', 'Опека', 'Нуждаемость', 'Профилактика']
+ALL_ROLES = ['Администратор', 'Начальник отдела', 'Куратор',
+             'Опека', 'Нуждаемость', 'Профилактика']
+# Роли с полным доступом к данным (все журналы + все отчёты + все справочники)
+FULL_DATA_ROLES = ('Администратор', 'Начальник отдела')
 
 app = Flask(__name__)
 
@@ -306,16 +313,34 @@ def is_admin(user=None):
     return bool(user) and user['role_name'] == 'Администратор'
 
 
-def can_edit_order_types(user=None):
-    """Справочник «Виды приказов» могут редактировать Администратор и Куратор."""
+def is_full_access(user=None):
+    """Полный доступ к данным: Администратор и Начальник отдела
+    (все журналы, все отчёты, все справочники)."""
     user = user or current_user()
-    return bool(user) and user['role_name'] in ('Администратор', 'Куратор')
+    return bool(user) and user['role_name'] in FULL_DATA_ROLES
+
+
+def can_edit_employees(user=None):
+    """Справочник «Сотрудники»: Администратор и Начальник отдела."""
+    return is_full_access(user)
+
+
+def can_edit_order_types(user=None):
+    """Справочник «Виды приказов»: Администратор, Начальник отдела, Куратор."""
+    user = user or current_user()
+    return bool(user) and user['role_name'] in FULL_DATA_ROLES + ('Куратор',)
+
+
+def can_view_reports(user=None):
+    """Отчёты: Администратор, Начальник отдела и Куратор."""
+    user = user or current_user()
+    return bool(user) and user['role_name'] in FULL_DATA_ROLES + ('Куратор',)
 
 
 def can_access_journal(user, journal):
     if not user:
         return False
-    if user['role_name'] == 'Администратор':
+    if user['role_name'] in FULL_DATA_ROLES:  # админ и начальник — полный доступ
         return True
     return user['role_name'] in ROLE_ACCESS[journal]
 
@@ -405,7 +430,8 @@ def employees():
 @app.route('/employees/save', methods=['POST'])
 def employee_save():
     user = current_user()
-    if not is_admin(user):
+    # Администратор и Начальник отдела
+    if not can_edit_employees(user):
         abort(403)
     eid = request.form.get('id', type=int)
     full_name = request.form.get('full_name', '').strip()
@@ -459,7 +485,7 @@ def employee_save():
 
 @app.route('/employees/delete/<int:eid>', methods=['POST'])
 def employee_delete(eid):
-    if not is_admin():
+    if not can_edit_employees():
         abort(403)
     conn = get_db()
     emp = conn.execute('SELECT * FROM employees WHERE id=?', (eid,)).fetchone()
@@ -540,6 +566,8 @@ def order_type_delete(tid):
 
 ROLE_ALIASES = {  # частые варианты написания ролей в таблицах Excel
     'админ': 'Администратор', 'admin': 'Администратор',
+    'начальник': 'Начальник отдела', 'нач. отдела': 'Начальник отдела',
+    'начальник отдела': 'Начальник отдела',
     'опекун': 'Опека', 'нуждающиеся': 'Нуждаемость',
     'профилактический учёт': 'Профилактика',
 }
@@ -624,7 +652,7 @@ def employees_import():
     при отсутствии пароля у нового пользователя создаётся пароль '1234'.
     """
     user = current_user()
-    if not is_admin(user):
+    if not can_edit_employees(user):
         abort(403)
     _need_xlsx()
     f = request.files.get('file')
@@ -1417,7 +1445,7 @@ def _query_report_rows(d1, d2, journal=None):
 @app.route('/reports')
 def reports():
     user = current_user()
-    if not user or user['role_name'] not in ('Администратор', 'Куратор'):
+    if not can_view_reports(user):
         abort(403)
     return render_template('reports.html')
 
@@ -1425,7 +1453,7 @@ def reports():
 @app.route('/reports/by_period')
 def report_by_period():
     user = current_user()
-    if not user or user['role_name'] not in ('Администратор', 'Куратор'):
+    if not can_view_reports(user):
         abort(403)
     d1, d2 = _report_period()
     rows = _query_report_rows(d1, d2)
@@ -1447,7 +1475,7 @@ def report_by_period():
 @app.route('/reports/by_period_detail')
 def report_by_period_detail():
     user = current_user()
-    if not user or user['role_name'] not in ('Администратор', 'Куратор'):
+    if not can_view_reports(user):
         abort(403)
     d1, d2 = _report_period()
     rows = _query_report_rows(d1, d2)
@@ -1480,7 +1508,7 @@ def report_by_period_detail():
 @app.route('/reports/journal_print')
 def report_journal_print():
     user = current_user()
-    if not user or user['role_name'] not in ('Администратор', 'Куратор'):
+    if not can_view_reports(user):
         abort(403)
     journal = request.args.get('journal', 'opeka')
     if journal not in JOURNAL_TYPES:
@@ -1778,15 +1806,69 @@ def service_restore():
     return redirect(url_for('service'))
 
 
+RESTART_PENDING_FILE = os.path.join(BASE_DIR, 'data', 'restart_pending')
+
+
+def _touch_restart_flag():
+    """Создаёт флаг-файл, сигнализирующий обёртке run.sh о необходимости
+    мягкого перезапуска приложения без выключения сервера."""
+    try:
+        os.makedirs(os.path.dirname(RESTART_PENDING_FILE), exist_ok=True)
+        with open(RESTART_PENDING_FILE, 'w') as fh:
+            fh.write(datetime.now().isoformat(timespec='seconds'))
+    except OSError:
+        pass
+
+
+def _find_app_pid():
+    """Находит PID процесса python, запустившего app.py (для завершения
+    с последующим автоматическим перезапуском обёрткой run.sh)."""
+    pid = None
+    try:
+        import psutil
+        me = os.getpid()
+        for p in psutil.process_iter(['pid', 'cmdline']):
+            try:
+                cmd = p.info['cmdline'] or []
+                if any(str(c).endswith('app.py') for c in cmd):
+                    if p.info['pid'] == me:
+                        return me
+                    pid = pid or p.info['pid']
+            except Exception:
+                continue
+    except ImportError:
+        pass
+    if pid is None:  # запасной вариант через ps
+        try:
+            import subprocess
+            out = subprocess.run(['ps', '-eo', 'pid,args'], capture_output=True,
+                                 text=True).stdout
+            for line in out.splitlines():
+                if 'app.py' in line and 'python' in line:
+                    cand = int(line.split()[0])
+                    if cand != os.getpid():
+                        pid = cand
+                        break
+        except Exception:
+            pass
+    return pid
+
+
 @app.route('/service/update', methods=['POST'])
 def service_update():
-    """Обновление приложения из ZIP-архива новой версии (только Администратор)."""
+    """Обновление приложения из ZIP-архива новой версии (только Администратор).
+
+    Работает БЕЗ ВЫКЛЮЧЕНИЯ СЕРВЕРА: файлы заменяются «на лету», затем
+    приложение мягко перезапускается (см. UPDATE_HOT.md и обёртку run.sh).
+    Параметры: soft=1 — только применить файлы, перезапуск выполнить вручную;
+    по умолчанию выполняется автоматический мягкий перезапуск."""
     if not is_admin():
         abort(403)
     f = request.files.get('package')
     if not f or not f.filename.lower().endswith('.zip'):
         flash('Загрузите ZIP-архив обновления', 'err')
         return redirect(url_for('service'))
+    soft = request.form.get('soft') == '1'
     tmp = tempfile.mkdtemp(prefix='update_')
     try:
         upath = os.path.join(tmp, 'pkg.zip')
@@ -1797,7 +1879,7 @@ def service_update():
         for root, dirs, files in os.walk(ex):
             rel = os.path.relpath(root, ex)
             if rel.startswith('data'):
-                continue  # не трогаем базу и сканы
+                continue  # не трогаем базу, сканы и логи — данные сохраняются
             target = os.path.normpath(os.path.join(BASE_DIR, rel))
             os.makedirs(target, exist_ok=True)
             for fn in files:
@@ -1811,8 +1893,27 @@ def service_update():
                 applied += 1
         write_version_file()
         audit('ОБНОВЛЕНИЕ ПРОГРАММЫ ПРИМЕНЕНО', f'файлов: {applied}')
-        flash(f'Обновление применено: файлов — {applied}. Перезапустите сервер при необходимости.',
-              'ok')
+        if not soft:
+            # Мягкий перезапуск без простоя сервера: файл-флаг + самозавершение
+            # процесса; обёртка run.sh сразу поднимет новую версию кода.
+            _touch_restart_flag()
+            audit('МЯГКИЙ ПЕРЕЗАПУСК', 'инициирован после применения обновления')
+            flash(f'Обновление применено: файлов — {applied}. '
+                  f'Сервер автоматически перезапускается на новой версии '
+                  f'(без потери данных).', 'ok')
+            def _delayed_exit():
+                time.sleep(1.5)  # даём ответу браузера (flash) уйти полностью
+                pid = _find_app_pid()
+                if pid == os.getpid() or pid is None:
+                    os._exit(0)
+                else:
+                    import signal
+                    os.kill(pid, signal.SIGTERM)
+            threading.Thread(target=_delayed_exit, daemon=True).start()
+        else:
+            flash(f'Обновление применено: файлов — {applied}. '
+                  f'Перезапустите сервер вручную (или снимите флажок мягкого режима).',
+                  'ok')
     except Exception as e:
         flash(f'Ошибка обновления: {e}', 'err')
     finally:

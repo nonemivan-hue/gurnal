@@ -13,10 +13,13 @@
     {% for j, t in accessible_journals %}
       <a href="{{ url_for('journal_list', journal=j) }}">{{ t }}</a>
     {% endfor %}
-    {% if cu and (cu.role_name in ['Администратор','Куратор']) %}
+    {% if cu and cu.role_name in ['Администратор','Начальник отдела','Куратор'] %}
       <a href="{{ url_for('reports') }}">Отчёты</a>
     {% endif %}
     <a href="{{ url_for('order_types') }}">Виды приказов</a>
+    {% if cu and cu.role_name == 'Начальник отдела' %}
+      <a href="{{ url_for('employees') }}">Сотрудники</a>
+    {% endif %}
     {% if cu and cu.role_name == 'Администратор' %}
       <a href="{{ url_for('employees') }}">Сотрудники</a>
       <a href="{{ url_for('service') }}">Сервис</a>
