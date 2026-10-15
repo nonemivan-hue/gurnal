@@ -308,5 +308,6 @@ sudo systemctl restart orders-journal
 | «Address already in use» / порт занят | программа сама подберёт свободный порт (см. консоль и `data/logs/app.log`); либо задайте свой: `--port 8090` |
 | Пользователи не видят страницу | проверьте, что брандмауэр открывает порт (раздел 3) и что в браузере указан правильный IP и порт |
 | Кнопки Excel/Word не работают | установите пакеты: `pip install openpyxl python-docx` и перезапустите |
+| В консоли и логе появляются ошибки 400 с бинарным мусором (`\x16\x03\x01…`) | кто-то обращается к HTTP-порту по протоколу HTTPS. Начиная с версии 1.3.2 такие подключения распознаются и не пишутся в `data/logs/app.log`. Чтобы пользователи могли работать по https://, настройте обратное проксирование nginx с TLS‑сертификатом (раздел 7) или запустите приложение через waitress/gunicorn с TLS |
 | Нужно сбросить пароль администратора | остановите сервис и выполните: `python3 -c "import sqlite3;from werkzeug.security import generate_password_hash as h;c=sqlite3.connect('data/orders.db');c.execute(\\"UPDATE employees SET password_hash=? WHERE login='admin'\\",(h('newpass'),));c.commit()"` |
 | Что делал пользователь? | страница «📜 Журнал» (фильтр по слову АУДИТ) или `grep` по `data/logs/app.log` |
