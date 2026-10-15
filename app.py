@@ -24,10 +24,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
 try:
-    from openpyxl import Workbook
+    from openpyxl import Workbook, load_workbook
     from openpyxl.styles import Font, Alignment, Border, Side
 except ImportError:
     Workbook = None
+    load_workbook = None
 
 try:
     from docx import Document as DocxDocument
@@ -63,7 +64,8 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.1.0'  # 1.1.0 — самостоятельная смена пароля сотрудником
+APP_VERSION = '1.2.0'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
+# 1.2.0 — поле «Примечание» во всех приказах + загрузка сотрудников и видов приказов из Excel
 
 
 def setup_logging():
@@ -209,6 +211,7 @@ CREATE TABLE IF NOT EXISTS orders (
     order_type_id INTEGER REFERENCES order_types(id),
     person_fio TEXT NOT NULL DEFAULT '',   -- ФИО в отношении кого
     specialist_fio TEXT NOT NULL DEFAULT '', -- ФИО специалиста
+    note TEXT NOT NULL DEFAULT '',         -- примечание (добавлено в 1.2.0)
     scan_path TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -229,6 +232,10 @@ def init_db():
     cols = [c['name'] for c in conn.execute('PRAGMA table_info(employees)')]
     if 'pwd_changed_at' not in cols:
         conn.execute('ALTER TABLE employees ADD COLUMN pwd_changed_at TEXT')
+    # Миграция: добавляем колонку note (примечание) в существующих базах
+    ocols = [c['name'] for c in conn.execute('PRAGMA table_info(orders)')]
+    if 'note' not in ocols:
+        conn.execute("ALTER TABLE orders ADD COLUMN note TEXT NOT NULL DEFAULT ''")
     # seed roles
     for r in ALL_ROLES:
         conn.execute('INSERT OR IGNORE INTO roles(name) VALUES (?)', (r,))
@@ -421,6 +428,10 @@ def employee_save():
                 (full_name, position, login_name, pw_hash, pwd_changed, role_id, eid))
             audit('ИЗМЕНЁН СОТРУДНИК', f'id={eid}, {full_name}')
         else:
+            # новый сотрудник: если логин задан, но пароль не указан —
+            # устанавливаем временный пароль '1234' (сотрудник сменит сам)
+            if login_name and not password:
+                password = '1234'
             pw_hash = generate_password_hash(password) if (login_name and password) else None
             conn.execute(
                 'INSERT INTO employees(full_name, position, login, password_hash, role_id) '
@@ -484,11 +495,13 @@ def order_type_save():
         else:
             conn.execute('INSERT INTO order_types(kind,name) VALUES (?,?)', (kind, name))
         conn.commit()
-        audit('ВИД ПРИКАЗА СОХРАНЁН', f'{journal}: {name}')
+        # в этой функции переменная называется kind (вид приказа), а не journal —
+        # исправлена ошибка NameError при аудите сохранения вида приказа
+        audit('ВИД ПРИКАЗА СОХРАНЁН', f'{JOURNAL_TITLES.get(kind, kind)}: {name}')
         flash('Вид приказа сохранён', 'ok')
     except sqlite3.IntegrityError:
         conn.rollback()
-        audit('ОШИБКА: ДУБЛЬ ВИДА ПРИКАЗА', f'{journal}: {name}')
+        audit('ОШИБКА: ДУБЛЬ ВИДА ПРИКАЗА', f'{JOURNAL_TITLES.get(kind, kind)}: {name}')
         flash('Такой вид приказа уже существует', 'err')
     finally:
         conn.close()
@@ -511,6 +524,256 @@ def order_type_delete(tid):
         audit('ВИД ПРИКАЗА УДАЛЁН', f'id={tid}')
         flash('Удалено', 'ok')
     return redirect(url_for('order_types'))
+
+# ------------------------------------------- импорт справочников из Excel (v1.2.0)
+
+ROLE_ALIASES = {  # частые варианты написания ролей в таблицах Excel
+    'админ': 'Администратор', 'admin': 'Администратор',
+    'опекун': 'Опека', 'нуждающиеся': 'Нуждаемость',
+    'профилактический учёт': 'Профилактика',
+}
+
+
+def _norm(s):
+    """Строка ячейки Excel -> чистое значение (даты приводим к ГГГГ-ММ-ДД)."""
+    if s is None:
+        return ''
+    if isinstance(s, datetime):
+        return s.strftime('%Y-%m-%d')
+    if hasattr(s, 'isoformat'):          # datetime.date / time
+        return s.isoformat()
+    return str(s).strip()
+
+
+def _cell_map(header):
+    """Заголовок листа -> {нормализованное имя столбца: номер столбца}.
+
+    Нормализация: нижний регистр, без точек/скобок/дефисов — чтобы распознать
+    «Ф.И.О. сотрудника», «ФИО сотрудника», «Наименование приказа» и т.п.
+    """
+    import re
+    m = {}
+    for i, c in enumerate(header):
+        key = _norm(c).lower().replace('ё', 'е')
+        key = re.sub(r'[^а-яa-z0-9]+', '', key)
+        if key and key not in m:
+            m[key] = i
+    return m
+
+
+def _pick(m, *variants):
+    """Возвращает индекс столбца по первому совпавшему варианту заголовка."""
+    for v in variants:
+        if v in m:
+            return m[v]
+    return None
+
+
+def _read_xlsx_rows(stream):
+    """Открывает поток как XLSX и возвращает список строк первого листа."""
+    wb = load_workbook(stream, data_only=True, read_only=True)
+    ws = wb.active
+    rows = [[_norm(c) for c in row] for row in ws.iter_rows(values_only=True)]
+    wb.close()
+    return [r for r in rows if any(r)]
+
+
+def _mem_xlsx(wb, filename):
+    buf = io.BytesIO()
+    wb.save(buf)
+    return _mem_download(
+        buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        filename)
+
+
+@app.route('/employees/template')
+def employees_template():
+    """Шаблон Excel для загрузки сотрудников (заполните лист и импортируйте)."""
+    _need_xlsx()
+    require_login()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Сотрудники'
+    ws.append(['ФИО сотрудника', 'Должность', 'Роль', 'Логин', 'Пароль'])
+    ws.append(['Иванов Иван Иванович', 'Главный специалист', 'Куратор', 'ivanov', '1234'])
+    ws.append(['Петрова Анна Сергеевна', 'Специалист', 'Опека', 'petrova', '1234'])
+    for c in ws[1]:
+        c.font = Font(bold=True)
+    for col, w in zip('ABCDE', (32, 26, 18, 16, 14)):
+        ws.column_dimensions[col].width = w
+    return _mem_xlsx(wb, 'шаблон_сотрудники.xlsx')
+
+
+@app.route('/employees/import', methods=['POST'])
+def employees_import():
+    """Массовая загрузка сотрудников из файла Excel (.xlsx). Только Администратор.
+
+    Формат: первая строка — заголовки (ФИО, Должность, Роль, Логин, Пароль).
+    Существующие сотрудники (совпадение по логину или ФИО+должности) обновляются;
+    при отсутствии пароля у нового пользователя создаётся пароль '1234'.
+    """
+    user = current_user()
+    if not is_admin(user):
+        abort(403)
+    _need_xlsx()
+    f = request.files.get('file')
+    if not f or not f.filename.lower().endswith('.xlsx'):
+        flash('Выберите файл Excel в формате .xlsx', 'err')
+        return redirect(url_for('employees'))
+    try:
+        rows = _read_xlsx_rows(io.BytesIO(f.read()))
+    except Exception as e:
+        flash(f'Не удалось прочитать файл: {e}', 'err')
+        return redirect(url_for('employees'))
+    if len(rows) < 2:
+        flash('В файле нет данных (нужны заголовок и хотя бы одна строка)', 'err')
+        return redirect(url_for('employees'))
+    m = _cell_map(rows[0])
+    ci_fio = _pick(m, 'фиосотрудника', 'фио', 'фамилияимяотчество', 'сотрудник')
+    ci_pos = _pick(m, 'должность')
+    ci_role = _pick(m, 'роль', 'rol')
+    ci_login = _pick(m, 'логин', 'login', 'пользователь')
+    ci_pw = _pick(m, 'пароль', 'password')
+    if ci_fio is None:
+        flash('В файле не найден столбец «ФИО сотрудника»', 'err')
+        return redirect(url_for('employees'))
+    conn = get_db()
+    roles = {r['name']: r['id'] for r in conn.execute('SELECT id, name FROM roles')}
+    created = updated = skipped = 0
+    errors = []
+    for n, row in enumerate(rows[1:], start=2):
+        fio = row[ci_fio] if ci_fio < len(row) else ''
+        if not fio:
+            skipped += 1
+            continue
+        position = row[ci_pos] if ci_pos is not None and ci_pos < len(row) else ''
+        role_raw = row[ci_role] if ci_role is not None and ci_role < len(row) else ''
+        login_name = row[ci_login] if ci_login is not None and ci_login < len(row) else ''
+        password = row[ci_pw] if ci_pw is not None and ci_pw < len(row) else ''
+        role_name = ROLE_ALIASES.get(role_raw.lower(), role_raw)
+        if role_name and role_name not in roles:
+            role_name = 'Куратор'
+            errors.append(f'строка {n}: роль «{role_raw}» неизвестна — назначен Куратор')
+        role_id = roles.get(role_name or 'Куратор')
+        ex = None
+        if login_name:
+            ex = conn.execute('SELECT * FROM employees WHERE login=?',
+                              (login_name,)).fetchone()
+        if not ex:
+            ex = conn.execute('SELECT * FROM employees WHERE full_name=? AND position=?',
+                              (fio, position)).fetchone()
+        try:
+            if ex:
+                pw_hash = ex['password_hash']
+                pwd_changed = ex['pwd_changed_at'] \
+                    if 'pwd_changed_at' in ex.keys() else None
+                if password:  # задан новый пароль — счётчик смены обнуляется
+                    pw_hash = generate_password_hash(password)
+                    pwd_changed = None
+                conn.execute(
+                    'UPDATE employees SET full_name=?, position=?, login=?, '
+                    'password_hash=?, pwd_changed_at=?, role_id=? WHERE id=?',
+                    (fio, position, login_name or ex['login'], pw_hash,
+                     pwd_changed, role_id, ex['id']))
+                updated += 1
+            else:
+                pw = password or '1234'  # временный пароль, сотрудник сменит сам
+                conn.execute(
+                    'INSERT INTO employees(full_name, position, login, '
+                    'password_hash, role_id) VALUES (?,?,?,?,?)',
+                    (fio, position, login_name or None,
+                     generate_password_hash(pw), role_id))
+                created += 1
+        except sqlite3.IntegrityError:
+            skipped += 1
+            errors.append(f'строка {n}: логин «{login_name}» уже занят')
+    conn.commit()
+    conn.close()
+    audit('ИМПОРТ СОТРУДНИКОВ ИЗ EXCEL',
+          f'файл={f.filename}, создано={created}, обновлено={updated}, пропущено={skipped}')
+    msg = f'Импорт завершён: создано — {created}, обновлено — {updated}, пропущено — {skipped}'
+    if errors:
+        msg += '. Замечания: ' + '; '.join(errors[:5])
+    flash(msg, 'ok')
+    return redirect(url_for('employees'))
+
+
+@app.route('/order_types/template')
+def order_types_template():
+    """Шаблон Excel для загрузки видов приказов."""
+    _need_xlsx()
+    require_login()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Виды приказов'
+    ws.append(['Вид приказа', 'Наименование приказа'])
+    for kind_title in JOURNAL_TITLES.values():
+        ws.append([kind_title, 'Например: Назначение опекуна'])
+    for c in ws[1]:
+        c.font = Font(bold=True)
+    ws.column_dimensions['A'].width = 22
+    ws.column_dimensions['B'].width = 45
+    return _mem_xlsx(wb, 'шаблон_виды_приказов.xlsx')
+
+
+@app.route('/order_types/import', methods=['POST'])
+def order_types_import():
+    """Массовая загрузка видов приказов из Excel (.xlsx). Только Администратор.
+
+    Столбец «Вид приказа» — название журнала (Опека / Нуждаемость / Профилактика),
+    дубликаты пар (вид+наименование) пропускаются.
+    """
+    user = current_user()
+    if not is_admin(user):
+        abort(403)
+    _need_xlsx()
+    f = request.files.get('file')
+    if not f or not f.filename.lower().endswith('.xlsx'):
+        flash('Выберите файл Excel в формате .xlsx', 'err')
+        return redirect(url_for('order_types'))
+    try:
+        rows = _read_xlsx_rows(io.BytesIO(f.read()))
+    except Exception as e:
+        flash(f'Не удалось прочитать файл: {e}', 'err')
+        return redirect(url_for('order_types'))
+    if len(rows) < 2:
+        flash('В файле нет данных (нужны заголовок и хотя бы одна строка)', 'err')
+        return redirect(url_for('order_types'))
+    m = _cell_map(rows[0])
+    ci_kind = _pick(m, 'видприказа', 'вид', 'журнал')
+    ci_name = _pick(m, 'наименованиеприказа', 'наименование', 'приказ')
+    if ci_kind is None or ci_name is None:
+        flash('В файле не найдены столбцы «Вид приказа» и «Наименование приказа»', 'err')
+        return redirect(url_for('order_types'))
+    # карта: название журнала (в любом регистре) -> ключ журнала
+    title_to_key = {t.lower(): k for k, t in JOURNAL_TITLES.items()}
+    conn = get_db()
+    created = skipped = 0
+    errors = []
+    for n, row in enumerate(rows[1:], start=2):
+        kind_raw = row[ci_kind] if ci_kind < len(row) else ''
+        name = row[ci_name] if ci_name < len(row) else ''
+        key = title_to_key.get(kind_raw.lower())
+        if not name or not key:
+            skipped += 1
+            if kind_raw and not key:
+                errors.append(f'строка {n}: неизвестный вид приказа «{kind_raw}»')
+            continue
+        try:
+            conn.execute('INSERT INTO order_types(kind,name) VALUES (?,?)', (key, name))
+            created += 1
+        except sqlite3.IntegrityError:
+            skipped += 1
+    conn.commit()
+    conn.close()
+    audit('ИМПОРТ ВИДОВ ПРИКАЗОВ ИЗ EXCEL',
+          f'файл={f.filename}, создано={created}, пропущено={skipped}')
+    msg = f'Импорт завершён: создано — {created}, пропущено — {skipped}'
+    if errors:
+        msg += '. Замечания: ' + '; '.join(errors[:5])
+    flash(msg, 'ok')
+    return redirect(url_for('order_types'))
+
 
 # ---------------------------------------------------------------- журналы
 
@@ -584,6 +847,7 @@ def journal_create(journal):
     type_id = request.form.get('order_type_id', type=int)
     person_fio = request.form.get('person_fio', '').strip()
     specialist_fio = request.form.get('specialist_fio', '').strip()
+    note = request.form.get('note', '').strip()          # примечание к приказу
     if type_id:
         ok = conn.execute('SELECT 1 FROM order_types WHERE id=? AND kind=?',
                           (type_id, journal)).fetchone()
@@ -604,8 +868,9 @@ def journal_create(journal):
         scan_rel = fname
     conn.execute(
         'INSERT INTO orders(journal, order_number, order_date, order_type_id, '
-        'person_fio, specialist_fio, scan_path) VALUES (?,?,?,?,?,?,?)',
-        (journal, order_number, order_date, type_id, person_fio, specialist_fio, scan_rel))
+        'person_fio, specialist_fio, note, scan_path) VALUES (?,?,?,?,?,?,?,?)',
+        (journal, order_number, order_date, type_id, person_fio, specialist_fio,
+         note, scan_rel))
     conn.commit()
     conn.close()
     audit('ПРИКАЗ СОЗДАН', f'журнал={JOURNAL_TITLES.get(journal)}, №={order_number}, по кому={person_fio}')
@@ -629,6 +894,7 @@ def order_update(oid):
     type_id = request.form.get('order_type_id', type=int)
     person_fio = request.form.get('person_fio', '').strip()
     specialist_fio = request.form.get('specialist_fio', '').strip()
+    note = request.form.get('note', '').strip()          # примечание к приказу
     scan_rel = row['scan_path']
     f = request.files.get('scan')
     if f and f.filename:
@@ -646,8 +912,9 @@ def order_update(oid):
         scan_rel = fname
     conn.execute(
         'UPDATE orders SET order_number=?, order_date=?, order_type_id=?, '
-        'person_fio=?, specialist_fio=?, scan_path=? WHERE id=?',
-        (order_number, order_date, type_id, person_fio, specialist_fio, scan_rel, oid))
+        'person_fio=?, specialist_fio=?, note=?, scan_path=? WHERE id=?',
+        (order_number, order_date, type_id, person_fio, specialist_fio,
+         note, scan_rel, oid))
     conn.commit()
     conn.close()
     audit('ПРИКАЗ ИЗМЕНЁН', f'id={oid}')
@@ -790,7 +1057,11 @@ def report_journal_print():
     data = []
     for i, r in enumerate(rows, 1):
         name = r['type_name'] or ''
+        note = r['note'] if 'note' in r.keys() else ''
+        # примечание включается в наименование приказа (по ТЗ — для Опеки)
         disp_name = (f'{name} ({r["person_fio"]})' if journal == 'opeka' else name)
+        if note:
+            disp_name = f'{disp_name}. Прим.: {note}' if disp_name else f'Прим.: {note}'
         data.append((i, r['order_number'], r['order_date'], r['person_fio'],
                      disp_name, r['specialist_fio']))
     headers = ('№ п/п', '№ приказа', 'Дата', 'Ф.И.О.', 'Наименование приказа', 'ФИО специалиста')

@@ -1,6 +1,19 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1>Справочник «Сотрудники»</h1>
+{% if cu and cu.role_name=='Администратор' %}
+<div class="panel no-print">
+  <h2>📥 Загрузка из Excel</h2>
+  <p class="muted">Формат файла .xlsx: первая строка — заголовки «ФИО сотрудника», «Должность», «Роль», «Логин», «Пароль».
+     Существующие сотрудники (по логину или ФИО+должности) обновляются, новые создаются.
+     Если пароль не указан — устанавливается временный «1234».</p>
+  <form method="post" action="{{ url_for('employees_import') }}" enctype="multipart/form-data" style="display:inline">
+    <input type="file" name="file" accept=".xlsx" required>
+    <button class="btn primary" type="submit">Импортировать</button>
+  </form>
+  <a class="btn" href="{{ url_for('employees_template') }}">⬇ Скачать шаблон Excel</a>
+</div>
+{% endif %}
 <table class="grid">
   <tr><th>ФИО</th><th>Должность</th><th>Логин</th><th>Роль</th><th>Пароль</th><th></th></tr>
   {% for r in rows %}

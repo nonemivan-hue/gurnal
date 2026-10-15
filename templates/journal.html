@@ -15,6 +15,7 @@
     </label>
     <label>Ф.И.О. в отношении кого приказ <input name="person_fio" required></label>
     <label>ФИО специалиста <input name="specialist_fio" value="{{ cu.full_name if cu else '' }}"></label>
+    <label>Примечание <input name="note" placeholder="необязательно"></label>
     <label>Скан (PDF) <input type="file" name="scan" accept=".pdf,application/pdf"></label>
     <button class="btn primary" type="submit">Зарегистрировать</button>
   </form>
@@ -28,7 +29,7 @@
 
 <table class="grid">
   <tr><th>№ п/п</th><th>№ приказа</th><th>Дата</th><th>Наименование приказа</th>
-      <th>Ф.И.О. в отношении кого</th><th>ФИО специалиста</th><th>Скан</th><th class="no-print"></th></tr>
+      <th>Ф.И.О. в отношении кого</th><th>ФИО специалиста</th><th>Примечание</th><th>Скан</th><th class="no-print"></th></tr>
   {% for r in rows %}
   <tr>
     <td>{{ loop.index }}</td>
@@ -37,17 +38,19 @@
     <td>{{ r.type_name or '—' }}</td>
     <td>{{ r.person_fio }}</td>
     <td>{{ r.specialist_fio }}</td>
+    <td>{{ r.note if 'note' in r.keys() else '' }}</td>
     <td>{% if r.scan_path %}<a href="{{ url_for('order_scan', oid=r.id) }}" target="_blank">📄 PDF</a>{% else %}—{% endif %}</td>
     <td class="actions no-print">
       <button class="btn sm" data-id="{{ r.id }}" data-number="{{ r.order_number }}" data-date="{{ r.order_date }}"
               data-typeid="{{ r.order_type_id or '' }}" data-person="{{ r.person_fio }}" data-spec="{{ r.specialist_fio }}"
+              data-note="{{ r.note if 'note' in r.keys() else '' }}"
               onclick="openEdit(this)">✏️ Изменить</button>
       <form method="post" action="{{ url_for('order_delete', oid=r.id) }}" style="display:inline"
             onsubmit="return confirm('Удалить приказ?')"><button class="btn sm danger">🗑</button></form>
     </td>
   </tr>
   {% endfor %}
-  {% if not rows %}<tr><td colspan="8" class="empty">Нет записей</td></tr>{% endif %}
+  {% if not rows %}<tr><td colspan="9" class="empty">Нет записей</td></tr>{% endif %}
 </table>
 
 <div class="panel" id="editPanel" style="display:none">
@@ -63,6 +66,7 @@
     </label>
     <label>Ф.И.О. в отношении кого <input name="person_fio" id="e_person"></label>
     <label>ФИО специалиста <input name="specialist_fio" id="e_spec"></label>
+    <label>Примечание <input name="note" id="e_note"></label>
     <label>Заменить скан (PDF) <input type="file" name="scan" accept=".pdf,application/pdf"></label>
     <button class="btn primary">Сохранить</button>
     <button class="btn" type="button" onclick="document.getElementById('editPanel').style.display='none'">Отмена</button>
@@ -77,6 +81,7 @@ function openEdit(b){
   document.getElementById('e_date').value = d.date;
   document.getElementById('e_person').value = d.person || '';
   document.getElementById('e_spec').value = d.spec || '';
+  document.getElementById('e_note').value = d.note || '';
   document.getElementById('e_type').value = d.typeid || '';
   document.getElementById('editNumTitle').textContent = d.number;
   document.getElementById('editPanel').style.display = 'block';
