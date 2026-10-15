@@ -1,2 +1,7 @@
-*.log
-*.out
+__pycache__/
+*.pyc
+data/*.db
+data/app.pid
+data/logs/
+server.out
+test_online*.py

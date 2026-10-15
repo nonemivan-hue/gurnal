@@ -6,12 +6,17 @@
 """
 import os
 import io
+import ast
 import json
+import hashlib
+import zlib
 import shutil
 import socket
 import sqlite3
 import logging
 import tempfile
+import threading
+import time
 import traceback
 from logging.handlers import RotatingFileHandler
 from datetime import date, datetime
@@ -64,10 +69,12 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.2.2'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
+APP_VERSION = '1.3.1'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
 # 1.2.0 — поле «Примечание» во всех приказах + загрузка сотрудников и видов приказов из Excel
 # 1.2.1 — куратору разрешено редактирование справочника «Виды приказов»
 # 1.2.2 — панель загрузки приказов в журналы из Excel + подробное описание обновления программы
+# 1.3.0 — роль «Начальник отдела» + обновление без выключения сервера
+# 1.3.1 — отображение активных пользователей в меню (Администратор, Куратор, Начальник отдела)
 
 
 def setup_logging():
@@ -129,12 +136,17 @@ JOURNAL_SUFFIX = {
     'nuzhdaemost': '-ну',
     'profilaktika': '-пр',
 }
+# Роль «Начальник отдела» добавлена в каждую группу доступа — она имеет
+# доступ ко всем журналам, всем отчётам и всем справочникам (версия 1.3.0).
 ROLE_ACCESS = {
-    'opeka': ('Администратор', 'Куратор', 'Опека'),
-    'nuzhdaemost': ('Администратор', 'Куратор', 'Нуждаемость'),
-    'profilaktika': ('Администратор', 'Куратор', 'Профилактика'),
+    'opeka': ('Администратор', 'Куратор', 'Начальник отдела', 'Опека'),
+    'nuzhdaemost': ('Администратор', 'Куратор', 'Начальник отдела', 'Нуждаемость'),
+    'profilaktika': ('Администратор', 'Куратор', 'Начальник отдела', 'Профилактика'),
 }
-ALL_ROLES = ['Администратор', 'Куратор', 'Опека', 'Нуждаемость', 'Профилактика']
+ALL_ROLES = ['Администратор', 'Начальник отдела', 'Куратор',
+             'Опека', 'Нуждаемость', 'Профилактика']
+# Роли с полным доступом к данным (все журналы + все отчёты + все справочники)
+FULL_DATA_ROLES = ('Администратор', 'Начальник отдела')
 
 app = Flask(__name__)
 
@@ -152,6 +164,192 @@ def _load_or_create_secret():
 
 
 app.secret_key = _load_or_create_secret()
+
+# ------------------------------------------------------------- активные пользователи
+# Реестр активных сессий: user_id -> {'sid': подпись сессии, 'last_seen': unix-time}.
+# Заполняется при входе, обновляется на каждом запросе; запись удаляется при выходе.
+ACTIVE_SESSIONS = {}
+ACTIVE_SESSIONS_LOCK = threading.Lock()
+# Сессия считается активной, если пользователь действовал не более N секунд назад
+ACTIVE_TIMEOUT = int(os.environ.get('ACTIVE_TIMEOUT', '300'))  # 5 минут
+
+
+def _session_signature(uid):
+    """Подпись сессии пользователя из signed cookie (секрет известен серверу).
+    Совпадение подписи означает, что cookie принадлежит реальной активной
+    сессии данного пользователя (а не «протухшему» cookie после перезапуска)."""
+    raw = request.cookies.get(app.config['SESSION_COOKIE_NAME'], '')
+    if not raw:
+        return ''
+    try:
+        data = app.session_serializer.loads(raw)
+        if isinstance(data, dict) and data.get('user_id') == uid:
+            return hashlib.sha1(
+                json.dumps(data, sort_keys=True).encode('utf-8')).hexdigest()[:16]
+    except Exception:
+        pass
+    return ''
+
+
+# --- Хранение активных сессий в БД (переживает перезапуск/обновление сервера)
+def _db_touch_throttled(key, min_interval=10.0):
+    """True, если с момента последней записи в БД по ключу прошло >= min_interval сек.
+    Защита от лишней нагрузки: UPDATE в active_sessions выполняется не на каждый
+    HTTP-запрос, а не чаще одного раза в 10 секунд на сессию."""
+    now = time.time()
+    last = _DB_TOUCH_TS.get(key, 0)
+    if now - last >= min_interval:
+        _DB_TOUCH_TS[key] = now
+        return True
+    return False
+
+
+_DB_TOUCH_TS = {}  # {(uid, sid): unix-time последней записи в БД}
+
+
+def db_touch_active_session(uid, sid, ip):
+    """Записать/обновить отметку активности сессии в таблице active_sessions."""
+    try:
+        conn = get_db()
+        conn.execute(
+            'INSERT INTO active_sessions(user_id, sid, last_seen, ip) '
+            'VALUES(?,?,?,?) '
+            'ON CONFLICT(user_id, sid) DO UPDATE SET last_seen=excluded.last_seen, '
+            'ip=excluded.ip', (uid, sid or '', time.time(), ip or ''))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass  # реестр в памяти остаётся основным источником
+
+
+def db_drop_active_session(uid, sid=None):
+    """Удалить запись(и) о сессиях пользователя из таблицы БД."""
+    try:
+        conn = get_db()
+        if sid is not None:
+            conn.execute('DELETE FROM active_sessions WHERE user_id=? AND sid=?',
+                         (uid, sid or ''))
+        else:
+            conn.execute('DELETE FROM active_sessions WHERE user_id=?', (uid,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def db_cleanup_active_sessions(cutoff):
+    """Удалить из таблицы БД устаревшие отметки активности."""
+    try:
+        conn = get_db()
+        conn.execute('DELETE FROM active_sessions WHERE last_seen < ?', (cutoff,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def db_load_active_sessions(cutoff):
+    """Загрузить свежие сессии из таблицы БД: {(user_id, sid): {...}}.
+    Используется при старте приложения, чтобы список «Онлайн» восстановился
+    после перезапуска без потери информации об активных пользователях."""
+    result = {}
+    try:
+        conn = get_db()
+        for r in conn.execute('SELECT user_id, sid, last_seen, ip '
+                              'FROM active_sessions WHERE last_seen >= ?',
+                              (cutoff,)):
+            result[(r['user_id'], r['sid'])] = {'last_seen': r['last_seen'],
+                                                'ip': r['ip'] or ''}
+        conn.close()
+    except Exception:
+        pass
+    return result
+
+
+def restore_active_sessions():
+    """При старте процесса загрузить активные сессии из БД в память."""
+    loaded = db_load_active_sessions(time.time() - ACTIVE_TIMEOUT)
+    if loaded:
+        with ACTIVE_SESSIONS_LOCK:
+            ACTIVE_SESSIONS.update(loaded)
+    return len(loaded)
+
+
+def touch_active_session(uid):
+    """Отметить сессию пользователя как активную (вызывается на каждом запросе).
+    Ключ реестра — (user_id, подпись cookie-сессии), поэтому несколько устройств
+    или вкладок одного сотрудника учитываются раздельно.
+    Дополнительно запись дублируется в таблицу active_sessions (БД) — это даёт
+    возможность видеть активных пользователей сразу после перезапуска сервера."""
+    sid = _session_signature(uid)
+    ip = request.remote_addr if has_request_context_safe() else ''
+    now = time.time()
+    with ACTIVE_SESSIONS_LOCK:
+        ACTIVE_SESSIONS[(uid, sid)] = {'last_seen': now, 'ip': ip}
+    # в БД пишем не на каждый запрос, а не чаще раза в 10 секунд на сессию
+    if _db_touch_throttled((uid, sid)):
+        db_touch_active_session(uid, sid, ip)
+
+
+def drop_active_session(uid, sid=None):
+    """Убрать сессию из реестра (выход / истечение срока)."""
+    with ACTIVE_SESSIONS_LOCK:
+        if sid is not None:
+            ACTIVE_SESSIONS.pop((uid, sid), None)
+            _DB_TOUCH_TS.pop((uid, sid), None)
+        else:  # сбрасываем все сессии данного пользователя
+            for key in [k for k in ACTIVE_SESSIONS if k[0] == uid]:
+                del ACTIVE_SESSIONS[key]
+                _DB_TOUCH_TS.pop(key, None)
+    db_drop_active_session(uid, sid)
+
+
+def cleanup_active_sessions():
+    """Удалить из реестра записи, превысившие срок неактивности
+    (как из памяти, так и из таблицы БД active_sessions)."""
+    cutoff = time.time() - ACTIVE_TIMEOUT
+    with ACTIVE_SESSIONS_LOCK:
+        expired = [k for k, v in ACTIVE_SESSIONS.items()
+                   if v['last_seen'] < cutoff]
+        for k in expired:
+            del ACTIVE_SESSIONS[k]
+    db_cleanup_active_sessions(cutoff)
+
+
+def get_active_users():
+    """Список активных пользователей (свежие сессии за последние ACTIVE_TIMEOUT сек):
+    [{'id','full_name','role_name','ip','seconds_ago'}] — сортировка по ФИО.
+    Если у сотрудника несколько активных сессий, показывается самая свежая."""
+    cleanup_active_sessions()
+    with ACTIVE_SESSIONS_LOCK:
+        items = [(k[0], dict(v)) for k, v in ACTIVE_SESSIONS.items()]
+    if not items:
+        return []
+    # самая свежая сессия для каждого пользователя
+    best = {}
+    for uid, v in items:
+        if uid not in best or v['last_seen'] > best[uid]['last_seen']:
+            best[uid] = v
+    ids = list(best.keys())
+    conn = get_db()
+    qmarks = ','.join('?' * len(ids))
+    rows = {r['id']: r for r in conn.execute(
+        f'SELECT e.id, e.full_name, r.name AS role_name FROM employees e '
+        f'LEFT JOIN roles r ON r.id=e.role_id WHERE e.id IN ({qmarks})',
+        ids)}
+    conn.close()
+    now = time.time()
+    result = []
+    for u, v in best.items():
+        row = rows.get(u)
+        if not row:
+            continue
+        result.append({'id': u, 'full_name': row['full_name'],
+                       'role_name': row['role_name'] or '—',
+                       'ip': v.get('ip', ''),
+                       'seconds_ago': int(now - v['last_seen'])})
+    result.sort(key=lambda x: x['full_name'])
+    return result
 
 
 @app.after_request
@@ -221,6 +419,13 @@ CREATE TABLE IF NOT EXISTS counters (
     journal TEXT PRIMARY KEY,
     value INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS active_sessions (
+    user_id INTEGER NOT NULL,
+    sid TEXT NOT NULL DEFAULT '',      -- подпись cookie-сессии
+    last_seen REAL NOT NULL,           -- unix-time последней активности
+    ip TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (user_id, sid)
+);                     -- реестр активных пользователей (переживает перезапуск)
 """
 
 
@@ -282,6 +487,10 @@ def write_version_file():
 
 init_db()
 write_version_file()
+# Восстанавливаем реестр активных пользователей из БД после перезапуска/обновления
+_n_restored = restore_active_sessions()
+if _n_restored:
+    log.info(f'[HTTP] Восстановлено активных сессий из БД: {_n_restored}')
 
 # ---------------------------------------------------------------- auth
 
@@ -306,16 +515,34 @@ def is_admin(user=None):
     return bool(user) and user['role_name'] == 'Администратор'
 
 
-def can_edit_order_types(user=None):
-    """Справочник «Виды приказов» могут редактировать Администратор и Куратор."""
+def is_full_access(user=None):
+    """Полный доступ к данным: Администратор и Начальник отдела
+    (все журналы, все отчёты, все справочники)."""
     user = user or current_user()
-    return bool(user) and user['role_name'] in ('Администратор', 'Куратор')
+    return bool(user) and user['role_name'] in FULL_DATA_ROLES
+
+
+def can_edit_employees(user=None):
+    """Справочник «Сотрудники»: Администратор и Начальник отдела."""
+    return is_full_access(user)
+
+
+def can_edit_order_types(user=None):
+    """Справочник «Виды приказов»: Администратор, Начальник отдела, Куратор."""
+    user = user or current_user()
+    return bool(user) and user['role_name'] in FULL_DATA_ROLES + ('Куратор',)
+
+
+def can_view_reports(user=None):
+    """Отчёты: Администратор, Начальник отдела и Куратор."""
+    user = user or current_user()
+    return bool(user) and user['role_name'] in FULL_DATA_ROLES + ('Куратор',)
 
 
 def can_access_journal(user, journal):
     if not user:
         return False
-    if user['role_name'] == 'Администратор':
+    if user['role_name'] in FULL_DATA_ROLES:  # админ и начальник — полный доступ
         return True
     return user['role_name'] in ROLE_ACCESS[journal]
 
@@ -327,12 +554,19 @@ def _guard():
         return
     if not session.get('user_id'):
         return redirect(url_for('login'))
+    # отмечаем сессию пользователя активной (для счётчика «онлайн» в меню)
+    touch_active_session(session['user_id'])
 
 
 @app.context_processor
 def inject_globals():
     user = current_user()
     journals = [j for j in JOURNAL_TYPES if user and can_access_journal(user, j)]
+    # Активные пользователи — видны Администратору, Куратору и Начальнику отдела
+    active_users = None
+    if user and user['role_name'] in ('Администратор', 'Куратор',
+                                      'Начальник отдела'):
+        active_users = get_active_users()
     return dict(
         cu=user,
         accessible_journals=[(j, JOURNAL_TITLES[j]) for j in journals],
@@ -340,6 +574,8 @@ def inject_globals():
         journal_titles=JOURNAL_TITLES,
         all_roles=ALL_ROLES,
         app_version=APP_VERSION,
+        active_users=active_users,
+        active_timeout=ACTIVE_TIMEOUT,
     )
 
 # ---------------------------------------------------------------- login
@@ -372,7 +608,10 @@ def login():
 
 @app.route('/logout')
 def logout():
+    uid = session.get('user_id')
     audit('ВЫХОД ИЗ СИСТЕМЫ')
+    if uid:  # убираем пользователя из реестра активных сессий
+        drop_active_session(uid, _session_signature(uid))
     session.clear()
     return redirect(url_for('login'))
 
@@ -405,7 +644,8 @@ def employees():
 @app.route('/employees/save', methods=['POST'])
 def employee_save():
     user = current_user()
-    if not is_admin(user):
+    # Администратор и Начальник отдела
+    if not can_edit_employees(user):
         abort(403)
     eid = request.form.get('id', type=int)
     full_name = request.form.get('full_name', '').strip()
@@ -459,7 +699,7 @@ def employee_save():
 
 @app.route('/employees/delete/<int:eid>', methods=['POST'])
 def employee_delete(eid):
-    if not is_admin():
+    if not can_edit_employees():
         abort(403)
     conn = get_db()
     emp = conn.execute('SELECT * FROM employees WHERE id=?', (eid,)).fetchone()
@@ -540,6 +780,8 @@ def order_type_delete(tid):
 
 ROLE_ALIASES = {  # частые варианты написания ролей в таблицах Excel
     'админ': 'Администратор', 'admin': 'Администратор',
+    'начальник': 'Начальник отдела', 'нач. отдела': 'Начальник отдела',
+    'начальник отдела': 'Начальник отдела',
     'опекун': 'Опека', 'нуждающиеся': 'Нуждаемость',
     'профилактический учёт': 'Профилактика',
 }
@@ -624,7 +866,7 @@ def employees_import():
     при отсутствии пароля у нового пользователя создаётся пароль '1234'.
     """
     user = current_user()
-    if not is_admin(user):
+    if not can_edit_employees(user):
         abort(403)
     _need_xlsx()
     f = request.files.get('file')
@@ -1417,7 +1659,7 @@ def _query_report_rows(d1, d2, journal=None):
 @app.route('/reports')
 def reports():
     user = current_user()
-    if not user or user['role_name'] not in ('Администратор', 'Куратор'):
+    if not can_view_reports(user):
         abort(403)
     return render_template('reports.html')
 
@@ -1425,7 +1667,7 @@ def reports():
 @app.route('/reports/by_period')
 def report_by_period():
     user = current_user()
-    if not user or user['role_name'] not in ('Администратор', 'Куратор'):
+    if not can_view_reports(user):
         abort(403)
     d1, d2 = _report_period()
     rows = _query_report_rows(d1, d2)
@@ -1447,7 +1689,7 @@ def report_by_period():
 @app.route('/reports/by_period_detail')
 def report_by_period_detail():
     user = current_user()
-    if not user or user['role_name'] not in ('Администратор', 'Куратор'):
+    if not can_view_reports(user):
         abort(403)
     d1, d2 = _report_period()
     rows = _query_report_rows(d1, d2)
@@ -1480,7 +1722,7 @@ def report_by_period_detail():
 @app.route('/reports/journal_print')
 def report_journal_print():
     user = current_user()
-    if not user or user['role_name'] not in ('Администратор', 'Куратор'):
+    if not can_view_reports(user):
         abort(403)
     journal = request.args.get('journal', 'opeka')
     if journal not in JOURNAL_TYPES:
@@ -1778,15 +2020,69 @@ def service_restore():
     return redirect(url_for('service'))
 
 
+RESTART_PENDING_FILE = os.path.join(BASE_DIR, 'data', 'restart_pending')
+
+
+def _touch_restart_flag():
+    """Создаёт флаг-файл, сигнализирующий обёртке run.sh о необходимости
+    мягкого перезапуска приложения без выключения сервера."""
+    try:
+        os.makedirs(os.path.dirname(RESTART_PENDING_FILE), exist_ok=True)
+        with open(RESTART_PENDING_FILE, 'w') as fh:
+            fh.write(datetime.now().isoformat(timespec='seconds'))
+    except OSError:
+        pass
+
+
+def _find_app_pid():
+    """Находит PID процесса python, запустившего app.py (для завершения
+    с последующим автоматическим перезапуском обёрткой run.sh)."""
+    pid = None
+    try:
+        import psutil
+        me = os.getpid()
+        for p in psutil.process_iter(['pid', 'cmdline']):
+            try:
+                cmd = p.info['cmdline'] or []
+                if any(str(c).endswith('app.py') for c in cmd):
+                    if p.info['pid'] == me:
+                        return me
+                    pid = pid or p.info['pid']
+            except Exception:
+                continue
+    except ImportError:
+        pass
+    if pid is None:  # запасной вариант через ps
+        try:
+            import subprocess
+            out = subprocess.run(['ps', '-eo', 'pid,args'], capture_output=True,
+                                 text=True).stdout
+            for line in out.splitlines():
+                if 'app.py' in line and 'python' in line:
+                    cand = int(line.split()[0])
+                    if cand != os.getpid():
+                        pid = cand
+                        break
+        except Exception:
+            pass
+    return pid
+
+
 @app.route('/service/update', methods=['POST'])
 def service_update():
-    """Обновление приложения из ZIP-архива новой версии (только Администратор)."""
+    """Обновление приложения из ZIP-архива новой версии (только Администратор).
+
+    Работает БЕЗ ВЫКЛЮЧЕНИЯ СЕРВЕРА: файлы заменяются «на лету», затем
+    приложение мягко перезапускается (см. UPDATE_HOT.md и обёртку run.sh).
+    Параметры: soft=1 — только применить файлы, перезапуск выполнить вручную;
+    по умолчанию выполняется автоматический мягкий перезапуск."""
     if not is_admin():
         abort(403)
     f = request.files.get('package')
     if not f or not f.filename.lower().endswith('.zip'):
         flash('Загрузите ZIP-архив обновления', 'err')
         return redirect(url_for('service'))
+    soft = request.form.get('soft') == '1'
     tmp = tempfile.mkdtemp(prefix='update_')
     try:
         upath = os.path.join(tmp, 'pkg.zip')
@@ -1797,7 +2093,7 @@ def service_update():
         for root, dirs, files in os.walk(ex):
             rel = os.path.relpath(root, ex)
             if rel.startswith('data'):
-                continue  # не трогаем базу и сканы
+                continue  # не трогаем базу, сканы и логи — данные сохраняются
             target = os.path.normpath(os.path.join(BASE_DIR, rel))
             os.makedirs(target, exist_ok=True)
             for fn in files:
@@ -1811,13 +2107,48 @@ def service_update():
                 applied += 1
         write_version_file()
         audit('ОБНОВЛЕНИЕ ПРОГРАММЫ ПРИМЕНЕНО', f'файлов: {applied}')
-        flash(f'Обновление применено: файлов — {applied}. Перезапустите сервер при необходимости.',
-              'ok')
+        if not soft:
+            # Мягкий перезапуск без простоя сервера: файл-флаг + самозавершение
+            # процесса; обёртка run.sh сразу поднимет новую версию кода.
+            _touch_restart_flag()
+            audit('МЯГКИЙ ПЕРЕЗАПУСК', 'инициирован после применения обновления')
+            flash(f'Обновление применено: файлов — {applied}. '
+                  f'Сервер автоматически перезапускается на новой версии '
+                  f'(без потери данных).', 'ok')
+            def _delayed_exit():
+                time.sleep(1.5)  # даём ответу браузера (flash) уйти полностью
+                pid = _find_app_pid()
+                if pid == os.getpid() or pid is None:
+                    os._exit(0)
+                else:
+                    import signal
+                    os.kill(pid, signal.SIGTERM)
+            threading.Thread(target=_delayed_exit, daemon=True).start()
+        else:
+            flash(f'Обновление применено: файлов — {applied}. '
+                  f'Перезапустите сервер вручную (или снимите флажок мягкого режима).',
+                  'ok')
     except Exception as e:
         flash(f'Ошибка обновления: {e}', 'err')
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return redirect(url_for('service'))
+
+
+# ------------------------------------------------- активные пользователи (API)
+
+@app.route('/api/active_users')
+def api_active_users():
+    """JSON со списком активных пользователей для меню «👥 Онлайн».
+    Доступ: Администратор, Куратор, Начальник отдела."""
+    user = current_user()
+    if not user or user['role_name'] not in ('Администратор', 'Куратор',
+                                             'Начальник отдела'):
+        abort(403)
+    users = get_active_users()
+    return Response(json.dumps({'timeout': ACTIVE_TIMEOUT, 'users': users},
+                                ensure_ascii=False),
+                    mimetype='application/json')
 
 # ---------------------------------------------------------------- profile / password
 
