@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Журнал «{{ title }}»</h1>
+
+<div class="panel">
+  <h2>➕ Новый приказ</h2>
+  <form method="post" action="{{ url_for('journal_create', journal=journal) }}" enctype="multipart/form-data">
+    <label>№ приказа <input name="order_number" placeholder="присвоится автоматически"></label>
+    <label>Дата приказа <input type="date" name="order_date" value="{{ today }}"></label>
+    <label>Наименование приказа
+      <select name="order_type_id" required>
+        <option value="">— выберите —</option>
+        {% for t in types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Ф.И.О. в отношении кого приказ <input name="person_fio" required></label>
+    <label>ФИО специалиста <input name="specialist_fio" value="{{ cu.full_name if cu else '' }}"></label>
+    <label>Скан (PDF) <input type="file" name="scan" accept=".pdf,application/pdf"></label>
+    <button class="btn primary" type="submit">Зарегистрировать</button>
+  </form>
+</div>
+
+<form method="get" class="searchbar no-print">
+  <input name="q" value="{{ q }}" placeholder="Поиск по номеру / ФИО…">
+  <button class="btn">Найти</button>
+  {% if q %}<a class="btn" href="{{ url_for('journal_list', journal=journal) }}">Сброс</a>{% endif %}
+</form>
+
+<table class="grid">
+  <tr><th>№ п/п</th><th>№ приказа</th><th>Дата</th><th>Наименование приказа</th>
+      <th>Ф.И.О. в отношении кого</th><th>ФИО специалиста</th><th>Скан</th><th class="no-print"></th></tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td>{{ r.order_number }}</td>
+    <td>{{ r.order_date }}</td>
+    <td>{{ r.type_name or '—' }}</td>
+    <td>{{ r.person_fio }}</td>
+    <td>{{ r.specialist_fio }}</td>
+    <td>{% if r.scan_path %}<a href="{{ url_for('order_scan', oid=r.id) }}" target="_blank">📄 PDF</a>{% else %}—{% endif %}</td>
+    <td class="actions no-print">
+      <button class="btn sm" data-id="{{ r.id }}" data-number="{{ r.order_number }}" data-date="{{ r.order_date }}"
+              data-typeid="{{ r.order_type_id or '' }}" data-person="{{ r.person_fio }}" data-spec="{{ r.specialist_fio }}"
+              onclick="openEdit(this)">✏️ Изменить</button>
+      <form method="post" action="{{ url_for('order_delete', oid=r.id) }}" style="display:inline"
+            onsubmit="return confirm('Удалить приказ?')"><button class="btn sm danger">🗑</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+  {% if not rows %}<tr><td colspan="8" class="empty">Нет записей</td></tr>{% endif %}
+</table>
+
+<div class="panel" id="editPanel" style="display:none">
+  <h2>Редактирование приказа № <span id="editNumTitle"></span></h2>
+  <form method="post" id="editForm" enctype="multipart/form-data">
+    <label>№ приказа <input name="order_number" id="e_num"></label>
+    <label>Дата <input type="date" name="order_date" id="e_date"></label>
+    <label>Наименование приказа
+      <select name="order_type_id" id="e_type">
+        <option value="">— не выбран —</option>
+        {% for t in types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Ф.И.О. в отношении кого <input name="person_fio" id="e_person"></label>
+    <label>ФИО специалиста <input name="specialist_fio" id="e_spec"></label>
+    <label>Заменить скан (PDF) <input type="file" name="scan" accept=".pdf,application/pdf"></label>
+    <button class="btn primary">Сохранить</button>
+    <button class="btn" type="button" onclick="document.getElementById('editPanel').style.display='none'">Отмена</button>
+  </form>
+</div>
+
+<script>
+function openEdit(b){
+  const d = b.dataset;
+  document.getElementById('editForm').action = '/order/' + d.id + '/update';
+  document.getElementById('e_num').value = d.number;
+  document.getElementById('e_date').value = d.date;
+  document.getElementById('e_person').value = d.person || '';
+  document.getElementById('e_spec').value = d.spec || '';
+  document.getElementById('e_type').value = d.typeid || '';
+  document.getElementById('editNumTitle').textContent = d.number;
+  document.getElementById('editPanel').style.display = 'block';
+  document.getElementById('editPanel').scrollIntoView({behavior:'smooth'});
+}
+</script>
+{% endblock %}

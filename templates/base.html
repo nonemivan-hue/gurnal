@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Журнал приказов{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar no-print">
+  <div class="brand"><a href="{{ url_for('index') }}">📋 Журнал приказов</a></div>
+  <nav>
+    {% for j, t in accessible_journals %}
+      <a href="{{ url_for('journal_list', journal=j) }}">{{ t }}</a>
+    {% endfor %}
+    {% if cu and (cu.role_name in ['Администратор','Куратор']) %}
+      <a href="{{ url_for('reports') }}">Отчёты</a>
+    {% endif %}
+    <a href="{{ url_for('order_types') }}">Виды приказов</a>
+    {% if cu and cu.role_name == 'Администратор' %}
+      <a href="{{ url_for('employees') }}">Сотрудники</a>
+      <a href="{{ url_for('service') }}">Сервис</a>
+    {% endif %}
+  </nav>
+  <div class="userbox">
+    {% if cu %}
+      <a href="{{ url_for('profile') }}" title="Сменить пароль">{{ cu.full_name }} ({{ cu.role_name }})</a>
+      <a href="{{ url_for('logout') }}">Выйти</a>
+    {% endif %}
+  </div>
+</header>
+<main class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in messages %}<div class="flash {{ cat }} no-print">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="foot no-print">Версия приложения: {{ app_version }}</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Моя учётная запись</h1>
+<div class="panel narrow">
+  <p><b>{{ cu.full_name }}</b><br>Должность: {{ cu.position or '—' }}<br>Роль: {{ cu.role_name }}</p>
+  {% if cu.login %}
+  <h2>Смена пароля</h2>
+  <form method="post">
+    <label>Текущий пароль <input type="password" name="old_password" required></label>
+    <label>Новый пароль <input type="password" name="new_password" required minlength="4"></label>
+    <button class="btn primary">Изменить пароль</button>
+  </form>
+  {% else %}
+  <p class="muted">Для вашей учётной записи вход не настроен (логин не назначен).</p>
+  {% endif %}
+</div>
+{% endblock %}
