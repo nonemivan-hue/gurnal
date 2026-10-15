@@ -1,3 +1,2 @@
-data/logs/
 *.log
-server.out
+*.out
