@@ -132,11 +132,38 @@ HOST=0.0.0.0 PORT=8090 ./dist/orders_server
 (systemd unit), только вместо `ExecStart=/usr/bin/python3 .../app.py` укажите
 `ExecStart=/opt/orders_journal/dist/orders_server`.
 
-Для Windows аналогично можно зарегистрировать запуск по расписанию:
+**Автозапуск сервера на Windows (подробное описание — INSTALL.md, раздел 7.4).**
+
+Способ 1 — служба Windows через NSSM (рекомендуется; запуск при загрузке ОС,
+автоматический перезапуск при сбое). PowerShell от имени администратора:
+
+```powershell
+nssm install JournalPrikazov "C:\orders_journal\dist\orders_server.exe" "--port 8080"
+nssm set JournalPrikazov AppDirectory "C:\orders_journal"
+nssm set JournalPrikazov Start SERVICE_AUTO_START
+nssm set JournalPrikazov AppStdout "C:\orders_journal\data\logs\service.out.log"
+nssm set JournalPrikazov AppStderr "C:\orders_journal\data\logs\service.err.log"
+nssm set JournalPrikazov AppRestartDelay 5000
+nssm start JournalPrikazov
+```
+
+Способ 2 — готовый скрипт `scripts\windows\install_autostart.ps1`: сам выбирает NSSM,
+а если его нет — регистрирует задачу Планировщика заданий с запуском при входе
+пользователя в систему. Управление службой: `Get-Service JournalPrikazov`,
+`Restart-Service JournalPrikazov` или оснастка services.msc. Удаление:
+`scripts\windows\uninstall_autostart.ps1`.
+
+Способ 3 — задача Планировщика заданий без NSSM (запуск при старте системы):
 
 ```bat
-schtasks /create /tn OrdersJournal /tr "C:\orders_journal\dist\orders_server.exe" ^
-    /sc onstart /ru SYSTEM
+schtasks /create /tn JournalPrikazov /tr "C:\orders_journal\dist\orders_server.exe --port 8080" ^
+    /sc onstart /ru SYSTEM /rl HIGHEST
+```
+
+После установки откройте порт в брандмауэре для доступа сотрудников по сети:
+
+```bat
+netsh advfirewall firewall add rule name="JournalPrikazov" dir=in action=allow protocol=TCP localport=8080
 ```
 
 ### 3.2. Клиент
