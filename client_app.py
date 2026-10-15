@@ -194,11 +194,17 @@ def cli_main(base, login, password):
             elif op == 'h':
                 print(help_txt)
             elif op in ('l', 'list'):
-                if arg not in journals:
-                    print('Укажите номер журнала:',
-                          ', '.join(f'{i+1}:{t}' for i, t in enumerate(journals)))
-                    continue
-                title = [t for t in journals if t == arg][0] if arg in journals else arg
+                # журнал можно задать названием («Опека») или порядковым номером («1»)
+                titles = list(journals)
+                if arg in journals:
+                    title = arg
+                else:
+                    try:
+                        title = titles[int(arg) - 1]
+                    except (ValueError, IndexError):
+                        print('Укажите номер или название журнала:',
+                              ', '.join(f'{i+1}:{t}' for i, t in enumerate(titles)))
+                        continue
                 q = input('Строка поиска (Enter — все): ').strip()
                 url = f'/api/v1/journal/{journals[title]}/orders'
                 if q:

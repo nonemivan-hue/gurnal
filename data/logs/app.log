@@ -1,0 +1,30 @@
+2026-10-15 13:57:32 | INFO     | [АУДИТ] ЖУРНАЛ ОЧИЩЕН пользователем id=1 (IP: 127.0.0.1); режим: keep; копия: app.log.20261015_135732.bak; удалено архивов ротации: 0
+2026-10-15 13:57:32 | INFO     | [HTTP] POST /logs/clear -> 302 (IP: 127.0.0.1, user_id: 1)
+2026-10-15 13:57:32 | INFO     | [HTTP] GET /logs -> 200 (IP: 127.0.0.1, user_id: 1)
+2026-10-15 13:57:32 | INFO     | [HTTP] POST /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 13:57:32 | WARNING  | [БЕЗОПАСНОСТЬ] Неудачная попытка входа: логин 'kurator_test' от IP 127.0.0.1
+2026-10-15 13:57:32 | INFO     | [HTTP] POST /logs/clear -> 302 (IP: 127.0.0.1, user_id: -)
+2026-10-15 13:57:32 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 13:57:32 | INFO     | [HTTP] GET /logs -> 302 (IP: 127.0.0.1, user_id: -)
+2026-10-15 13:57:32 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 13:57:40 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:57:40 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+2026-10-15 13:57:40 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+2026-10-15 13:57:40 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | Тест Куратор
+2026-10-15 13:57:40 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+2026-10-15 13:57:40 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+2026-10-15 13:57:51 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Тест Куратор (kurator_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:57:51 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 37)
+2026-10-15 13:57:51 | WARNING  | [HTTP] POST /logs/clear -> 403 (IP: 127.0.0.1, user_id: 37)
+2026-10-15 13:57:51 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: Тест Куратор (kurator_test) | IP: 127.0.0.1 | POST /logs/clear
+2026-10-15 13:57:51 | WARNING  | [HTTP] GET /logs -> 403 (IP: 127.0.0.1, user_id: 37)
+2026-10-15 13:57:51 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: Тест Куратор (kurator_test) | IP: 127.0.0.1 | GET /logs
+2026-10-15 13:57:51 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 13:58:28 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 14:17:58 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 14:18:28 | INFO     | [HTTP] GET /api/v1/session -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 14:18:33 | INFO     | [HTTP] GET /api/v1/session -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 14:18:49 | INFO     | [HTTP] GET /api/v1/session -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 14:18:49 | INFO     | [HTTP] GET /api/v1/journal/opeka/orders -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 14:18:49 | INFO     | [HTTP] GET /api/v1/order_types -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 14:24:15 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)

@@ -7,6 +7,7 @@
 import os
 import io
 import re
+import sys
 import ast
 import json
 import hashlib
@@ -44,7 +45,15 @@ try:
 except ImportError:
     DocxDocument = None
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Поддержка запуска из собранного PyInstaller-бинарника:
+#  - ресурсы (templates/, static/) берутся из внутриархивного каталога _MEIPASS;
+#  - рабочие данные (data/) — рядом с исполняемым файлом, чтобы обновление
+#    программы не затрагивало базу, сканы и логи.
+if getattr(sys, 'frozen', False):               # запуск EXE-сборки
+    RESOURCE_DIR = sys._MEIPASS                  # распакованные ресурсы
+    BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    RESOURCE_DIR = BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'data', 'orders.db')
 UPLOAD_DIR = os.path.join(BASE_DIR, 'data', 'scans')
 ARCHIVE_DIR = os.path.join(BASE_DIR, 'data', 'archives')
@@ -70,7 +79,7 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.4.1'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
+APP_VERSION = '1.5.1'  # 1.5.0 — клиентское приложение; 1.5.1 — поддержка сборки PyInstaller
 # 1.2.0 — поле «Примечание» во всех приказах + загрузка сотрудников и видов приказов из Excel
 # 1.2.1 — куратору разрешено редактирование справочника «Виды приказов»
 # 1.2.2 — панель загрузки приказов в журналы из Excel + подробное описание обновления программы
@@ -79,6 +88,8 @@ APP_VERSION = '1.4.1'  # 1.1.0 — смена пароля сотруднико�
 # 1.3.2 — фильтрация мусора от HTTPS-подключений к HTTP-порту в логах
 # 1.4.0 — REST API v1 (/api/v1/...) + клиентское десктопное приложение client_app.py
 # 1.4.1 — очистка журнала логирования администратором (режимы: с копией / только копия / полная)
+# 1.5.0 — настраиваемый префикс номера приказа по каждому виду приказа
+#         (справочник «Виды приказов» -> колонка «Префикс номера», пример: 1-ОП)
 
 
 def setup_logging():
@@ -171,11 +182,34 @@ JOURNAL_TITLES = {
     'nuzhdaemost': 'Нуждаемость',
     'profilaktika': 'Профилактика',
 }
-JOURNAL_SUFFIX = {
+JOURNAL_SUFFIX = {  # суффикс номера приказа по умолчанию (если префикс не задан)
     'opeka': '-оп',
     'nuzhdaemost': '-ну',
     'profilaktika': '-пр',
 }
+
+
+def journal_prefix(conn, journal):
+    """Префикс номера приказа для журнала (настройка в справочнике «Виды приказов»).
+
+    Префиксы хранятся в таблице order_types в колонке prefix: строка с непустым
+    prefix и есть настройка вида приказа. Значение приводится к виду «-ОП»:
+    добавляется ведущий дефис, пробелы убираются. Пустой префикс -> используется
+    суффикс журнала по умолчанию (JOURNAL_SUFFIX). Пример: вид «Опека»,
+    префикс «ОП», номер 1 -> «1-ОП».
+    """
+    try:
+        row = conn.execute(
+            "SELECT prefix FROM order_types WHERE kind=? AND TRIM(COALESCE(prefix,''))<>''"
+            ' ORDER BY id LIMIT 1', (journal,)).fetchone()
+    except sqlite3.Error:   # колонки ещё нет (миграция не выполнена) — дефолт
+        row = None
+    if not row or not (row['prefix'] or '').strip():
+        return JOURNAL_SUFFIX.get(journal, '')
+    p = row['prefix'].strip().upper() if row['prefix'].strip().isascii() else row['prefix'].strip()
+    if not p.startswith('-'):
+        p = '-' + p
+    return p
 # Роль «Начальник отдела» добавлена в каждую группу доступа — она имеет
 # доступ ко всем журналам, всем отчётам и всем справочникам (версия 1.3.0).
 ROLE_ACCESS = {
@@ -188,7 +222,9 @@ ALL_ROLES = ['Администратор', 'Начальник отдела', '�
 # Роли с полным доступом к данным (все журналы + все отчёты + все справочники)
 FULL_DATA_ROLES = ('Администратор', 'Начальник отдела')
 
-app = Flask(__name__)
+app = Flask(__name__,
+            static_folder=os.path.join(RESOURCE_DIR, 'static'),
+            template_folder=os.path.join(RESOURCE_DIR, 'templates'))
 
 
 def _load_or_create_secret():
@@ -481,6 +517,7 @@ CREATE TABLE IF NOT EXISTS order_types (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,              -- вид приказа (название журнала)
     name TEXT NOT NULL,              -- наименование приказа
+    prefix TEXT NOT NULL DEFAULT '', -- префикс номера приказа для вида (напр. "ОП" -> 1-ОП)
     UNIQUE(kind, name)
 );
 CREATE TABLE IF NOT EXISTS orders (
@@ -523,6 +560,10 @@ def init_db():
     ocols = [c['name'] for c in conn.execute('PRAGMA table_info(orders)')]
     if 'note' not in ocols:
         conn.execute("ALTER TABLE orders ADD COLUMN note TEXT NOT NULL DEFAULT ''")
+    # Миграция v1.5.0: колонка prefix (префикс номера приказа) в справочнике видов приказов
+    tcols = [c['name'] for c in conn.execute('PRAGMA table_info(order_types)')]
+    if 'prefix' not in tcols:
+        conn.execute("ALTER TABLE order_types ADD COLUMN prefix TEXT NOT NULL DEFAULT ''")
     # seed roles
     for r in ALL_ROLES:
         conn.execute('INSERT OR IGNORE INTO roles(name) VALUES (?)', (r,))
@@ -1147,7 +1188,7 @@ def next_order_number(conn, journal):
     if not row:
         conn.execute('INSERT INTO counters(journal,value) VALUES (?,1)', (journal,))
         row = conn.execute('SELECT value FROM counters WHERE journal=?', (journal,)).fetchone()
-    return f"{row['value']}{JOURNAL_SUFFIX[journal]}"
+    return f"{row['value']}{journal_prefix(conn, journal)}"
 
 
 @app.route('/journal/<journal>')
@@ -1202,6 +1243,9 @@ def journal_create(journal):
     if not order_number:
         order_number = next_order_number(conn, journal)
     else:
+        # если номер введён без префикса вида приказа — добавляем его (v1.5.0): 1 -> 1-ОП
+        if '-' not in order_number and order_number.split('-')[0].isdigit():
+            order_number += journal_prefix(conn, journal)
         # синхронизация счётчика, если пользователь ввёл больший номер
         base = order_number.split('-')[0]
         if base.isdigit():
@@ -1259,13 +1303,14 @@ def journal_template(journal):
         base = _norm(r['order_number']).split('-')[0]
         if base.isdigit():
             maxn = max(maxn, int(base))
+    pfx = journal_prefix(conn, journal)   # префикс из справочника видов приказов (v1.5.0)
     conn.close()
     wb = Workbook()
     ws = wb.active
     ws.title = JOURNAL_TITLES[journal]
     ws.append(_orders_xlsx_headers(journal))
     # примеры заполнения
-    ws.append([f'{maxn + 1}{JOURNAL_SUFFIX[journal]}', date.today().isoformat(),
+    ws.append([f'{maxn + 1}{pfx}', date.today().isoformat(),
                JOURNAL_TITLES[journal], types[0]['name'] if types else 'Наименование приказа',
                'Иванов Иван Иванович', 'Петров П. П.', 'Примечание (необязательно)'])
     ws.append(['', '', JOURNAL_TITLES[journal],
@@ -1406,8 +1451,8 @@ def journal_import(journal):
         num = cell(row, ci_num)
         if num:
             num = _norm(num)
-            if '-' not in num:          # добавляем суффикс журнала: 15 -> 15-оп
-                num += JOURNAL_SUFFIX[journal]
+            if '-' not in num:          # добавляем префикс вида приказа: 15 -> 15-ОП
+                num += journal_prefix(conn, journal)
         else:
             num = next_order_number(conn, journal)
         add_order(num, dt, tid, person, cell(row, ci_spec), cell(row, ci_note))
@@ -1489,10 +1534,11 @@ def journal_scans_page(journal):
     conn = get_db()
     types = conn.execute('SELECT id, name FROM order_types WHERE kind=? ORDER BY name',
                          (journal,)).fetchall()
+    sfx = journal_prefix(conn, journal)   # префикс из справочника видов приказов (v1.5.0)
     conn.close()
     return render_template('journal_scans.html', journal=journal,
                            title=JOURNAL_TITLES[journal], types=types,
-                           suffix=JOURNAL_SUFFIX[journal])
+                           suffix=sfx)
 
 
 @app.route('/journal/<journal>/scans/upload', methods=['POST'])
@@ -1586,7 +1632,7 @@ def journal_scans_upload(journal):
                 note = (note + '; ' + note_extra) if note else note_extra
             has_suffix = '-' in num
             if not has_suffix and num and num.split('-')[0].isdigit():
-                num += JOURNAL_SUFFIX[journal]
+                num += journal_prefix(conn, journal)   # префикс из справочника (v1.5.0)
             recs = existing_nums.get(_norm(num).lower(), []) if num else []
             if mode != 'new' and recs:
                 rec = next((x for x in recs if not x['scan_path']), recs[0])
@@ -1653,6 +1699,9 @@ def order_update(oid):
         conn.close()
         abort(403)
     order_number = request.form.get('order_number', '').strip() or row['order_number']
+    # если номер изменён на число без префикса вида приказа — добавляем префикс (v1.5.0)
+    if '-' not in order_number and order_number.split('-')[0].isdigit():
+        order_number += journal_prefix(conn, journal)
     order_date = request.form.get('order_date') or row['order_date']
     type_id = request.form.get('order_type_id', type=int)
     person_fio = request.form.get('person_fio', '').strip()
@@ -1915,6 +1964,7 @@ def api_order_types():
         data = request.get_json(silent=True) or {}
         kind = (data.get('kind') or '').strip()
         name = (data.get('name') or '').strip()
+        prefix = _norm((data.get('prefix') or '')).strip()  # префикс номера приказа (v1.5.0)
         tid = data.get('id')
         if kind not in JOURNAL_TYPES or not name:
             return api_json({'error': 'Укажите журнал (вид приказа) и наименование'}, 400)
@@ -1930,8 +1980,8 @@ def api_order_types():
                 if dup:
                     conn.close()
                     return api_json({'error': 'Такой вид приказа уже существует'}, 400)
-                conn.execute('UPDATE order_types SET kind=?, name=? WHERE id=?',
-                             (kind, name, int(tid)))
+                conn.execute('UPDATE order_types SET kind=?, name=?, prefix=? WHERE id=?',
+                             (kind, name, prefix, int(tid)))
                 action = 'ВИД ПРИКАЗА ИЗМЕНЁН (API)'
             else:
                 dup = conn.execute('SELECT 1 FROM order_types WHERE kind=? AND name=?',
@@ -1939,8 +1989,8 @@ def api_order_types():
                 if dup:
                     conn.close()
                     return api_json({'error': 'Такой вид приказа уже существует'}, 400)
-                conn.execute('INSERT INTO order_types(kind,name) VALUES (?,?)',
-                             (kind, name))
+                conn.execute('INSERT INTO order_types(kind,name,prefix) VALUES (?,?,?)',
+                             (kind, name, prefix))
                 action = 'ВИД ПРИКАЗА СОХРАНЁН (API)'
             conn.commit()
         finally:
@@ -2021,6 +2071,9 @@ def api_order_create(journal):
     conn = get_db()
     order_number = (data.get('order_number') or '').strip() \
         or next_order_number(conn, journal)
+    # номер без префикса вида приказа дополняем префиксом из справочника (v1.5.0)
+    if '-' not in order_number and order_number.split('-')[0].isdigit():
+        order_number += journal_prefix(conn, journal)
     base = order_number.split('-')[0]
     if base.isdigit():
         conn.execute('UPDATE counters SET value=MAX(value,?) WHERE journal=?',
@@ -2081,6 +2134,10 @@ def api_order_item(oid):
                           (int(upd['order_type_id']), journal)).fetchone()
         if not ok:
             upd['order_type_id'] = None
+    # номер без префикса вида приказа дополняем префиксом из справочника (v1.5.0)
+    _num = str(upd['order_number'] or '')
+    if '-' not in _num and _num.split('-')[0].isdigit():
+        upd['order_number'] = _num + journal_prefix(conn, journal)
     conn.execute('UPDATE orders SET order_number=?, order_date=?, order_type_id=?, '
                  'person_fio=?, specialist_fio=?, note=? WHERE id=?',
                  (upd['order_number'], upd['order_date'], upd['order_type_id'],

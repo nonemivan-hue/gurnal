@@ -1,0 +1,934 @@
+nohup: ignoring input
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-10-15 12:44:55 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.3.1, логи: /workspace/data/logs/app.log)
+Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
+Журнал логирования: /workspace/data/logs/app.log
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://21.0.4.143:8080
+Press CTRL+C to quit
+2026-10-15 12:44:58 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 12:44:58] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:04:22 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:04:22] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:05:53 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:05:53] "GET /login HTTP/1.1" 200 -
+Terminated
+[run.sh] Мягкий перезапуск: старт новой версии кода...
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-10-15 13:05:58 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.3.1, логи: /workspace/data/logs/app.log)
+Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
+Журнал логирования: /workspace/data/logs/app.log
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://21.0.4.143:8080
+Press CTRL+C to quit
+2026-10-15 13:06:00 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:06:00] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:06:17 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:06:17 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:17 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:17 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:17 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Куратор
+2026-10-15 13:06:17 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:17 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:17 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:17 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Начотдел
+2026-10-15 13:06:17 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:17 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:17 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Куратор (cur_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:06:17 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 15)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:17 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Начотдел (head_test) | IP: 127.0.0.1 | роль: Начальник отдела
+2026-10-15 13:06:17 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 16)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:17 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Опекун
+2026-10-15 13:06:17 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:17 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:17] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | роль: Опека
+2026-10-15 13:06:18 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 17)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 15)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 15)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 16)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 16)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 17)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:18 | WARNING  | [HTTP] GET /api/active_users -> 403 (IP: 127.0.0.1, user_id: 17)
+2026-10-15 13:06:18 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | GET /api/active_users
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET /api/active_users HTTP/1.1" 403 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [АУДИТ] ВЫХОД ИЗ СИСТЕМЫ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | 
+2026-10-15 13:06:18 | INFO     | [HTTP] GET /logout -> 302 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET /logout HTTP/1.1" 302 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 15)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=3
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /employees/delete/3 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /employees/delete/3 HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /employees/delete/1 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /employees/delete/1 HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=7
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /employees/delete/7 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /employees/delete/7 HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [АУДИТ] ОШИБКА СОХРАНЕНИЯ СОТРУДНИКА | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | занятый логин: cur_test
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /employees/delete/1 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /employees/delete/1 HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=17
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /employees/delete/17 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /employees/delete/17 HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=6
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /employees/delete/6 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /employees/delete/6 HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [АУДИТ] ОШИБКА СОХРАНЕНИЯ СОТРУДНИКА | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | занятый логин: head_test
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:21 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Куратор (cur_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 15)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Начотдел (head_test) | IP: 127.0.0.1 | роль: Начальник отдела
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 16)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Опекун
+2026-10-15 13:06:21 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | роль: Опека
+2026-10-15 13:06:22 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 18)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 15)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 15)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 16)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 16)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 18)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:22 | WARNING  | [HTTP] GET /api/active_users -> 403 (IP: 127.0.0.1, user_id: 18)
+2026-10-15 13:06:22 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | GET /api/active_users
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET /api/active_users HTTP/1.1" 403 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [АУДИТ] ВЫХОД ИЗ СИСТЕМЫ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | 
+2026-10-15 13:06:22 | INFO     | [HTTP] GET /logout -> 302 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET /logout HTTP/1.1" 302 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 15)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:22 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:22] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:25 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:06:25 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:25] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:25 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:25] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:25 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:25] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:06:32 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=2
+2026-10-15 13:06:32 | INFO     | [HTTP] POST /employees/delete/2 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "POST /employees/delete/2 HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=15
+2026-10-15 13:06:32 | INFO     | [HTTP] POST /employees/delete/15 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "POST /employees/delete/15 HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=16
+2026-10-15 13:06:32 | INFO     | [HTTP] POST /employees/delete/16 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "POST /employees/delete/16 HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Куратор
+2026-10-15 13:06:32 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Начотдел
+2026-10-15 13:06:32 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Куратор (cur_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:06:32 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 19)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Начотдел (head_test) | IP: 127.0.0.1 | роль: Начальник отдела
+2026-10-15 13:06:32 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 20)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] ОШИБКА СОХРАНЕНИЯ СОТРУДНИКА | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | занятый логин: opeka_test
+2026-10-15 13:06:32 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | роль: Опека
+2026-10-15 13:06:32 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 18)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 19)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 19)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 20)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 20)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 18)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:32 | WARNING  | [HTTP] GET /api/active_users -> 403 (IP: 127.0.0.1, user_id: 18)
+2026-10-15 13:06:32 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | GET /api/active_users
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /api/active_users HTTP/1.1" 403 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [АУДИТ] ВЫХОД ИЗ СИСТЕМЫ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | 
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /logout -> 302 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /logout HTTP/1.1" 302 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 19)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:32 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:32] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:06:36 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] POST /employees/delete/1 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "POST /employees/delete/1 HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=20
+2026-10-15 13:06:36 | INFO     | [HTTP] POST /employees/delete/20 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "POST /employees/delete/20 HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=18
+2026-10-15 13:06:36 | INFO     | [HTTP] POST /employees/delete/18 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "POST /employees/delete/18 HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [АУДИТ] ОШИБКА СОХРАНЕНИЯ СОТРУДНИКА | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | занятый логин: cur_test
+2026-10-15 13:06:36 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Начотдел
+2026-10-15 13:06:36 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Куратор (cur_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:06:36 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 19)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Начотдел (head_test) | IP: 127.0.0.1 | роль: Начальник отдела
+2026-10-15 13:06:36 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 21)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Опекун
+2026-10-15 13:06:36 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | роль: Опека
+2026-10-15 13:06:36 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 22)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 19)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 19)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 21)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 21)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 22)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:36 | WARNING  | [HTTP] GET /api/active_users -> 403 (IP: 127.0.0.1, user_id: 22)
+2026-10-15 13:06:36 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | GET /api/active_users
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /api/active_users HTTP/1.1" 403 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [АУДИТ] ВЫХОД ИЗ СИСТЕМЫ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | 
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /logout -> 302 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /logout HTTP/1.1" 302 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 19)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:36 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:36] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:44 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:06:44 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:44] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:44 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:44] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:45 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Опекун
+2026-10-15 13:06:45 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:45] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:45 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:45] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:52 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:06:52 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:52 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:52 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:52 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=19
+2026-10-15 13:06:52 | INFO     | [HTTP] POST /employees/delete/19 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "POST /employees/delete/19 HTTP/1.1" 302 -
+2026-10-15 13:06:52 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:52 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=21
+2026-10-15 13:06:52 | INFO     | [HTTP] POST /employees/delete/21 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "POST /employees/delete/21 HTTP/1.1" 302 -
+2026-10-15 13:06:52 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:52 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=22
+2026-10-15 13:06:52 | INFO     | [HTTP] POST /employees/delete/22 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "POST /employees/delete/22 HTTP/1.1" 302 -
+2026-10-15 13:06:52 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:52 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=23
+2026-10-15 13:06:52 | INFO     | [HTTP] POST /employees/delete/23 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "POST /employees/delete/23 HTTP/1.1" 302 -
+2026-10-15 13:06:52 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:52 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Куратор
+2026-10-15 13:06:52 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:52 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:52] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:53 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Начотдел
+2026-10-15 13:06:53 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:53 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:53 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Куратор (cur_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:06:53 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 24)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:53 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Начотдел (head_test) | IP: 127.0.0.1 | роль: Начальник отдела
+2026-10-15 13:06:53 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 25)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:53 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:53 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=24
+2026-10-15 13:06:53 | INFO     | [HTTP] POST /employees/delete/24 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "POST /employees/delete/24 HTTP/1.1" 302 -
+2026-10-15 13:06:53 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:53 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=25
+2026-10-15 13:06:53 | INFO     | [HTTP] POST /employees/delete/25 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "POST /employees/delete/25 HTTP/1.1" 302 -
+2026-10-15 13:06:53 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:53 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Опекун
+2026-10-15 13:06:53 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:53 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:53 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | роль: Опека
+2026-10-15 13:06:53 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 26)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:53 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:53 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:53 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 24)
+127.0.0.1 - - [15/Oct/2026 13:06:53] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:53 | WARNING  | [HTTP] GET /api/active_users -> 403 (IP: 127.0.0.1, user_id: 24)
+2026-10-15 13:06:53 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: id=24 | IP: 127.0.0.1 | GET /api/active_users
+127.0.0.1 - - [15/Oct/2026 13:06:53] "GET /api/active_users HTTP/1.1" 403 -
+2026-10-15 13:06:57 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:06:57 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:57] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:57 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:57] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:57 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:57] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:57 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=26
+2026-10-15 13:06:57 | INFO     | [HTTP] POST /employees/delete/26 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:57] "POST /employees/delete/26 HTTP/1.1" 302 -
+2026-10-15 13:06:57 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:57] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:58 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Куратор
+2026-10-15 13:06:58 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:58 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:58 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Начотдел
+2026-10-15 13:06:58 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:58 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:58 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Куратор (cur_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:06:58 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 27)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:58 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Начотдел (head_test) | IP: 127.0.0.1 | роль: Начальник отдела
+2026-10-15 13:06:58 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 28)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:58 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:58 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=27
+2026-10-15 13:06:58 | INFO     | [HTTP] POST /employees/delete/27 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "POST /employees/delete/27 HTTP/1.1" 302 -
+2026-10-15 13:06:58 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:58 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=28
+2026-10-15 13:06:58 | INFO     | [HTTP] POST /employees/delete/28 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "POST /employees/delete/28 HTTP/1.1" 302 -
+2026-10-15 13:06:58 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:58 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Опекун
+2026-10-15 13:06:58 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:06:58 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:06:58 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | роль: Опека
+2026-10-15 13:06:58 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 29)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:06:58 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:58 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:06:58 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 27)
+127.0.0.1 - - [15/Oct/2026 13:06:58] "GET / HTTP/1.1" 200 -
+2026-10-15 13:06:58 | WARNING  | [HTTP] GET /api/active_users -> 403 (IP: 127.0.0.1, user_id: 27)
+2026-10-15 13:06:58 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: id=27 | IP: 127.0.0.1 | GET /api/active_users
+127.0.0.1 - - [15/Oct/2026 13:06:58] "GET /api/active_users HTTP/1.1" 403 -
+2026-10-15 13:07:06 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:07:06 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:06] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:06 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:06] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:06 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:06] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:06 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=29
+2026-10-15 13:07:06 | INFO     | [HTTP] POST /employees/delete/29 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:06] "POST /employees/delete/29 HTTP/1.1" 302 -
+2026-10-15 13:07:06 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:06] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:06 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:06] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:06 | INFO     | [HTTP] POST /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 13:07:06 | WARNING  | [БЕЗОПАСНОСТЬ] Неудачная попытка входа: логин 'cur_test' от IP 127.0.0.1
+127.0.0.1 - - [15/Oct/2026 13:07:06] "POST /login HTTP/1.1" 200 -
+2026-10-15 13:07:06 | INFO     | [HTTP] GET /api/active_users -> 302 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:07:06] "GET /api/active_users HTTP/1.1" 302 -
+2026-10-15 13:07:06 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:07:06] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:07:18 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Куратор
+2026-10-15 13:07:18 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Начотдел
+2026-10-15 13:07:18 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Опекун
+2026-10-15 13:07:18 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Куратор (cur_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:07:18 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 30)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 30)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 30)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Начотдел (head_test) | IP: 127.0.0.1 | роль: Начальник отдела
+2026-10-15 13:07:18 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 31)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 31)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 31)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | роль: Опека
+2026-10-15 13:07:18 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 32)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 32)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:18 | WARNING  | [HTTP] GET /api/active_users -> 403 (IP: 127.0.0.1, user_id: 32)
+2026-10-15 13:07:18 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | GET /api/active_users
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 403 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 30)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 30)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 31)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 31)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 32)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:18 | WARNING  | [HTTP] GET /api/active_users -> 403 (IP: 127.0.0.1, user_id: 32)
+2026-10-15 13:07:18 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | GET /api/active_users
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 403 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] ВЫХОД ИЗ СИСТЕМЫ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | 
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /logout -> 302 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /logout HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 30)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=30
+2026-10-15 13:07:18 | INFO     | [HTTP] POST /employees/delete/30 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "POST /employees/delete/30 HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=31
+2026-10-15 13:07:18 | INFO     | [HTTP] POST /employees/delete/31 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "POST /employees/delete/31 HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=32
+2026-10-15 13:07:18 | INFO     | [HTTP] POST /employees/delete/32 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "POST /employees/delete/32 HTTP/1.1" 302 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:18 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:18] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:07:23 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Куратор
+2026-10-15 13:07:23 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Начотдел
+2026-10-15 13:07:23 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Опекун
+2026-10-15 13:07:23 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Куратор (cur_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:07:23 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 33)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 33)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 33)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Начотдел (head_test) | IP: 127.0.0.1 | роль: Начальник отдела
+2026-10-15 13:07:23 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 34)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 34)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:23 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 34)
+127.0.0.1 - - [15/Oct/2026 13:07:23] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | роль: Опека
+2026-10-15 13:07:24 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 35)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 35)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:24 | WARNING  | [HTTP] GET /api/active_users -> 403 (IP: 127.0.0.1, user_id: 35)
+2026-10-15 13:07:24 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | GET /api/active_users
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /api/active_users HTTP/1.1" 403 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 33)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 33)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 34)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 34)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 35)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:24 | WARNING  | [HTTP] GET /api/active_users -> 403 (IP: 127.0.0.1, user_id: 35)
+2026-10-15 13:07:24 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | GET /api/active_users
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /api/active_users HTTP/1.1" 403 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [АУДИТ] ВЫХОД ИЗ СИСТЕМЫ | пользователь: ТестОнлайн Опекун (opeka_test) | IP: 127.0.0.1 | 
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /logout -> 302 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /logout HTTP/1.1" 302 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 33)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=33
+2026-10-15 13:07:24 | INFO     | [HTTP] POST /employees/delete/33 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "POST /employees/delete/33 HTTP/1.1" 302 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=34
+2026-10-15 13:07:24 | INFO     | [HTTP] POST /employees/delete/34 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "POST /employees/delete/34 HTTP/1.1" 302 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=35
+2026-10-15 13:07:24 | INFO     | [HTTP] POST /employees/delete/35 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "POST /employees/delete/35 HTTP/1.1" 302 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:24 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:24] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:32 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:07:32 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:32] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:32 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:32] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:32 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | ТестОнлайн Куратор
+2026-10-15 13:07:32 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:32] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:07:32 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:32] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:32 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: ТестОнлайн Куратор (cur_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:07:32 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 36)
+127.0.0.1 - - [15/Oct/2026 13:07:32] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:07:32 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 36)
+127.0.0.1 - - [15/Oct/2026 13:07:32] "GET / HTTP/1.1" 200 -
+2026-10-15 13:07:32 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:32] "GET /api/active_users HTTP/1.1" 200 -
+Terminated
+[run.sh] Мягкий перезапуск: старт новой версии кода...
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-10-15 13:07:33 | INFO     | [HTTP] Восстановлено активных сессий из БД: 13
+2026-10-15 13:07:33 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.3.1, логи: /workspace/data/logs/app.log)
+Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
+Журнал логирования: /workspace/data/logs/app.log
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://21.0.4.143:8080
+Press CTRL+C to quit
+2026-10-15 13:07:36 | INFO     | [HTTP] GET /api/active_users -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:36] "GET /api/active_users HTTP/1.1" 200 -
+2026-10-15 13:07:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:36] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:36 | INFO     | [АУДИТ] СОТРУДНИК УДАЛЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | id=36
+2026-10-15 13:07:36 | INFO     | [HTTP] POST /employees/delete/36 -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:36] "POST /employees/delete/36 HTTP/1.1" 302 -
+2026-10-15 13:07:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:36] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:07:36 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:07:36] "GET /employees HTTP/1.1" 200 -
+Terminated
+[run.sh] Мягкий перезапуск: старт новой версии кода...
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-10-15 13:37:00 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.3.2, логи: /workspace/data/logs/app.log)
+Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
+Журнал логирования: /workspace/data/logs/app.log
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://21.0.4.143:8080
+Press CTRL+C to quit
+2026-10-15 13:37:08 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:37:08] "GET /login HTTP/1.1" 200 -
+127.0.0.1 - - [15/Oct/2026 13:37:14] code 400, message Bad request syntax ('\x16\x03\x01\x00P\x01\x00\x00L\x03\x03ªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªª')
+127.0.0.1 - - [15/Oct/2026 13:37:14] "\x16\x03\x01\x00P\x01\x00\x00L\x03\x03ªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªª" 400 -
+127.0.0.1 - - [15/Oct/2026 13:37:21] code 400, message Bad request syntax ('\x16\x03\x01\x07\x18\x01\x00\x07\x14\x03\x03abcdefghªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªª')
+127.0.0.1 - - [15/Oct/2026 13:37:21] "\x16\x03\x01\x07\x18\x01\x00\x07\x14\x03\x03abcdefghªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªª" 400 -
+Terminated
+[run.sh] Мягкий перезапуск: старт новой версии кода...
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-10-15 13:37:28 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.3.2, логи: /workspace/data/logs/app.log)
+Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
+Журнал логирования: /workspace/data/logs/app.log
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://21.0.4.143:8080
+Press CTRL+C to quit
+127.0.0.1 - - [15/Oct/2026 13:37:30] code 400, message Bad request syntax ('\x16\x03\x01\x07\x18\x01\x00\x07\x14\x03\x03abcdefghªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªª')
+127.0.0.1 - - [15/Oct/2026 13:37:30] "\x16\x03\x01\x07\x18\x01\x00\x07\x14\x03\x03abcdefghªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªªª" 400 -
+Terminated
+[run.sh] Мягкий перезапуск: старт новой версии кода...
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-10-15 13:38:29 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.3.2, логи: /workspace/data/logs/app.log)
+Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
+Журнал логирования: /workspace/data/logs/app.log
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://21.0.4.143:8080
+Press CTRL+C to quit
+2026-10-15 13:38:34 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:38:34] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:46:30 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:46:30] "GET /login HTTP/1.1" 200 -
+Terminated
+[run.sh] Мягкий перезапуск: старт новой версии кода...
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-10-15 13:50:46 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.4.0, логи: /workspace/data/logs/app.log)
+Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
+Журнал логирования: /workspace/data/logs/app.log
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://21.0.4.143:8080
+Press CTRL+C to quit
+2026-10-15 13:50:46 | INFO     | [HTTP] GET /api/v1/info -> 302 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:50:46] "GET /api/v1/info HTTP/1.1" 302 -
+Terminated
+[run.sh] Мягкий перезапуск: старт новой версии кода...
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-10-15 13:51:15 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.4.0, логи: /workspace/data/logs/app.log)
+Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
+Журнал логирования: /workspace/data/logs/app.log
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://21.0.4.143:8080
+Press CTRL+C to quit
+2026-10-15 13:51:17 | INFO     | [HTTP] GET /api/v1/info -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:51:17] "GET /api/v1/info HTTP/1.1" 200 -
+2026-10-15 13:51:17 | INFO     | [HTTP] GET /api/v1/session -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:51:17] "GET /api/v1/session HTTP/1.1" 200 -
+2026-10-15 13:51:18 | INFO     | [АУДИТ] НЕУДАЧНЫЙ ВХОД (API) | пользователь: не авторизован | IP: 127.0.0.1 | login=admin
+2026-10-15 13:51:18 | WARNING  | [HTTP] GET /api/v1/session -> 401 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:51:18] "GET /api/v1/session HTTP/1.1" 401 -
+Terminated
+[run.sh] Мягкий перезапуск: старт новой версии кода...
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-10-15 13:56:53 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.4.1, логи: /workspace/data/logs/app.log)
+Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
+Журнал логирования: /workspace/data/logs/app.log
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://21.0.4.143:8080
+Press CTRL+C to quit
+2026-10-15 13:56:54 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:56:54] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:57:21 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:57:21 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:21] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:57:21 | INFO     | [HTTP] GET /logs -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:21] "GET /logs HTTP/1.1" 200 -
+2026-10-15 13:57:21 | INFO     | [АУДИТ] ЖУРНАЛ ОЧИЩАЕТСЯ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | режим: backup
+2026-10-15 13:57:21 | INFO     | [АУДИТ] ЖУРНАЛ ОЧИЩЕН пользователем id=1 (IP: 127.0.0.1); режим: backup; копия: app.log.20261015_135721.bak; удалено архивов ротации: 0
+2026-10-15 13:57:21 | INFO     | [HTTP] POST /logs/clear -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:21] "POST /logs/clear HTTP/1.1" 302 -
+2026-10-15 13:57:21 | INFO     | [HTTP] GET /logs -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:21] "GET /logs HTTP/1.1" 200 -
+2026-10-15 13:57:21 | INFO     | [АУДИТ] ЖУРНАЛ ОЧИЩАЕТСЯ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | режим: keep
+2026-10-15 13:57:21 | INFO     | [АУДИТ] ЖУРНАЛ ОЧИЩЕН пользователем id=1 (IP: 127.0.0.1); режим: keep; копия: app.log.20261015_135721.bak; удалено архивов ротации: 1
+2026-10-15 13:57:21 | INFO     | [HTTP] POST /logs/clear -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:21] "POST /logs/clear HTTP/1.1" 302 -
+2026-10-15 13:57:21 | INFO     | [HTTP] GET /logs -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:21] "GET /logs HTTP/1.1" 200 -
+2026-10-15 13:57:21 | WARNING  | [HTTP] GET /index -> 404 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:21] "GET /index HTTP/1.1" 404 -
+2026-10-15 13:57:21 | INFO     | [АУДИТ] ЖУРНАЛ ОЧИЩАЕТСЯ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | режим: full
+2026-10-15 13:57:21 | INFO     | [АУДИТ] ЖУРНАЛ ОЧИЩЕН пользователем id=1 (IP: 127.0.0.1); режим: full; копия: нет; удалено архивов ротации: 1
+2026-10-15 13:57:21 | INFO     | [HTTP] POST /logs/clear -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:21] "POST /logs/clear HTTP/1.1" 302 -
+2026-10-15 13:57:21 | INFO     | [HTTP] GET /logs -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:21] "GET /logs HTTP/1.1" 200 -
+2026-10-15 13:57:21 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:21] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:57:32 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:57:32 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:32] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:57:32 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:32] "GET / HTTP/1.1" 200 -
+2026-10-15 13:57:32 | WARNING  | [HTTP] GET /index -> 404 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:32] "GET /index HTTP/1.1" 404 -
+2026-10-15 13:57:32 | INFO     | [АУДИТ] ЖУРНАЛ ОЧИЩАЕТСЯ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | режим: keep
+2026-10-15 13:57:32 | INFO     | [АУДИТ] ЖУРНАЛ ОЧИЩЕН пользователем id=1 (IP: 127.0.0.1); режим: keep; копия: app.log.20261015_135732.bak; удалено архивов ротации: 0
+2026-10-15 13:57:32 | INFO     | [HTTP] POST /logs/clear -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:32] "POST /logs/clear HTTP/1.1" 302 -
+2026-10-15 13:57:32 | INFO     | [HTTP] GET /logs -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:32] "GET /logs HTTP/1.1" 200 -
+2026-10-15 13:57:32 | INFO     | [HTTP] POST /login -> 200 (IP: 127.0.0.1, user_id: -)
+2026-10-15 13:57:32 | WARNING  | [БЕЗОПАСНОСТЬ] Неудачная попытка входа: логин 'kurator_test' от IP 127.0.0.1
+127.0.0.1 - - [15/Oct/2026 13:57:32] "POST /login HTTP/1.1" 200 -
+2026-10-15 13:57:32 | INFO     | [HTTP] POST /logs/clear -> 302 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:57:32] "POST /logs/clear HTTP/1.1" 302 -
+2026-10-15 13:57:32 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:57:32] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:57:32 | INFO     | [HTTP] GET /logs -> 302 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:57:32] "GET /logs HTTP/1.1" 302 -
+2026-10-15 13:57:32 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:57:32] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:57:40 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | роль: Администратор
+2026-10-15 13:57:40 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:40] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:57:40 | INFO     | [HTTP] GET / -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:40] "GET / HTTP/1.1" 200 -
+2026-10-15 13:57:40 | INFO     | [АУДИТ] СОТРУДНИК СОХРАНЁН | пользователь: Системный администратор (admin) | IP: 127.0.0.1 | Тест Куратор
+2026-10-15 13:57:40 | INFO     | [HTTP] POST /employees/save -> 302 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:40] "POST /employees/save HTTP/1.1" 302 -
+2026-10-15 13:57:40 | INFO     | [HTTP] GET /employees -> 200 (IP: 127.0.0.1, user_id: 1)
+127.0.0.1 - - [15/Oct/2026 13:57:40] "GET /employees HTTP/1.1" 200 -
+2026-10-15 13:57:51 | INFO     | [АУДИТ] ВХОД В СИСТЕМУ | пользователь: Тест Куратор (kurator_test) | IP: 127.0.0.1 | роль: Куратор
+2026-10-15 13:57:51 | INFO     | [HTTP] POST /login -> 302 (IP: 127.0.0.1, user_id: 37)
+127.0.0.1 - - [15/Oct/2026 13:57:51] "POST /login HTTP/1.1" 302 -
+2026-10-15 13:57:51 | WARNING  | [HTTP] POST /logs/clear -> 403 (IP: 127.0.0.1, user_id: 37)
+2026-10-15 13:57:51 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: Тест Куратор (kurator_test) | IP: 127.0.0.1 | POST /logs/clear
+127.0.0.1 - - [15/Oct/2026 13:57:51] "POST /logs/clear HTTP/1.1" 403 -
+2026-10-15 13:57:51 | WARNING  | [HTTP] GET /logs -> 403 (IP: 127.0.0.1, user_id: 37)
+2026-10-15 13:57:51 | INFO     | [АУДИТ] ОТКАЗ В ДОСТУПЕ (403) | пользователь: Тест Куратор (kurator_test) | IP: 127.0.0.1 | GET /logs
+127.0.0.1 - - [15/Oct/2026 13:57:51] "GET /logs HTTP/1.1" 403 -
+2026-10-15 13:57:51 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:57:51] "GET /login HTTP/1.1" 200 -
+2026-10-15 13:58:28 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 13:58:28] "GET /login HTTP/1.1" 200 -
+2026-10-15 14:17:58 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 14:17:58] "GET /login HTTP/1.1" 200 -
+2026-10-15 14:18:28 | INFO     | [HTTP] GET /api/v1/session -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 14:18:28] "GET /api/v1/session HTTP/1.1" 200 -
+2026-10-15 14:18:33 | INFO     | [HTTP] GET /api/v1/session -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 14:18:33] "GET /api/v1/session HTTP/1.1" 200 -
+2026-10-15 14:18:49 | INFO     | [HTTP] GET /api/v1/session -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 14:18:49] "GET /api/v1/session HTTP/1.1" 200 -
+2026-10-15 14:18:49 | INFO     | [HTTP] GET /api/v1/journal/opeka/orders -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 14:18:49] "GET /api/v1/journal/opeka/orders?q=Опека HTTP/1.1" 200 -
+2026-10-15 14:18:49 | INFO     | [HTTP] GET /api/v1/order_types -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 14:18:49] "GET /api/v1/order_types HTTP/1.1" 200 -
+2026-10-15 14:24:15 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 14:24:15] "GET /login HTTP/1.1" 200 -
