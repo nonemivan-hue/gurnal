@@ -1,2 +1,25 @@
+# Рабочие данные и секреты (не версионируются)
+data/orders.db
+data/secret_key.txt
+data/app.pid
+data/scans/
+data/archives/
+data/logs/
+data/restart_pending
+
+# Логи и артефакты запуска
+server.out
+server.log
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Артефакты сборки PyInstaller
 build/
 dist/
+
+# Тестовые скрипты
+test_*.py
