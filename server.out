@@ -125,3 +125,5 @@ Press CTRL+C to quit
 127.0.0.1 - - [15/Oct/2026 10:45:41] "GET /login HTTP/1.1" 200 -
 2026-10-15 10:45:50 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
 127.0.0.1 - - [15/Oct/2026 10:45:50] "GET /login HTTP/1.1" 200 -
+2026-10-15 10:49:43 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 10:49:43] "GET /login HTTP/1.1" 200 -

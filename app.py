@@ -1094,6 +1094,224 @@ def journal_import(journal):
     return redirect(url_for('journal_list', journal=journal))
 
 
+def _parse_order_filename(fname):
+    """Разбор имени файла скана в реквизиты приказа.
+
+    Формат: №приказа_ГГГГ-ММ-ДД_ФамилияИмяОтчество_Примечание.pdf
+    Пример: 12-оп_2026-10-15_Иванов Иван Иванович_о назначении опекуна.pdf
+    Необязательные части пропускаются; разбор максимально терпимый:
+      - номер — первое поле до '_' (или вся строка, если полей нет);
+      - дата — любое поле вида ГГГГ-ММ-ДД / ДД.ММ.ГГГГ / ДД-ММ-ГГГГ;
+      - примечание — поле после ФИО (если полей больше трёх).
+    Возвращает dict(number, date, person, note) — значения могут быть ''.
+    """
+    base = os.path.splitext(os.path.basename(fname))[0]
+    parts = [p.strip() for p in base.split('_')]
+    number = date_v = person = note = ''
+    if parts and parts[0]:
+        number = parts[0]
+    for p in parts[1:]:
+        d = _norm(p).replace('.', '-').replace('/', '-')
+        m = re.match(r'^(\d{4})-(\d{1,2})-(\d{1,2})$', d) or \
+            re.match(r'^(\d{1,2})-(\d{1,2})-(\d{2,4})$', d)
+        if m:
+            if len(m.group(1)) == 4:
+                y, mo, da = m.group(1), m.group(2), m.group(3)
+            else:
+                y2 = m.group(3)
+                y = ('20' + y2.zfill(2)) if len(y2) <= 2 else y2
+                mo, da = m.group(1), m.group(2)
+            date_v = f'{y}-{mo.zfill(2)}-{da.zfill(2)}'
+            continue
+        if not person:
+            person = p
+        elif not note:
+            note = p
+    return {'number': number, 'date': date_v, 'person': person, 'note': note}
+
+
+def _find_type_id(conn, journal, name):
+    """Ищет вид приказа (order_types) по наименованию для журнала; не найдено — создаёт."""
+    if not name:
+        return None
+    r = conn.execute('SELECT id FROM order_types WHERE kind=? AND LOWER(TRIM(name))=?',
+                     (journal, _norm(name).lower())).fetchone()
+    if r:
+        return r['id']
+    try:
+        cur = conn.execute('INSERT INTO order_types(kind,name) VALUES (?,?)',
+                           (journal, _norm(name)))
+        conn.commit()
+        return cur.lastrowid
+    except sqlite3.IntegrityError:
+        r = conn.execute('SELECT id FROM order_types WHERE kind=? AND LOWER(TRIM(name))=?',
+                         (journal, _norm(name).lower())).fetchone()
+        return r['id'] if r else None
+
+
+@app.route('/journal/<journal>/scans')
+def journal_scans_page(journal):
+    """Страница пакетной загрузки PDF-сканов приказов в журнал."""
+    if journal not in JOURNAL_TYPES:
+        abort(404)
+    user = current_user()
+    if not can_access_journal(user, journal):
+        abort(403)
+    conn = get_db()
+    types = conn.execute('SELECT id, name FROM order_types WHERE kind=? ORDER BY name',
+                         (journal,)).fetchall()
+    conn.close()
+    return render_template('journal_scans.html', journal=journal,
+                           title=JOURNAL_TITLES[journal], types=types,
+                           suffix=JOURNAL_SUFFIX[journal])
+
+
+@app.route('/journal/<journal>/scans/upload', methods=['POST'])
+def journal_scans_upload(journal):
+    """Пакетная загрузка сканов приказов (PDF) в журнал из архива ZIP или списка файлов.
+
+    Правила:
+      - принимаются только PDF (и .zip с PDF внутри);
+      - если имя файла совпадает с № существующего приказа без скана — скан
+        прикрепляется к нему;
+      - иначе создаётся новый приказ: реквизиты берутся из имени файла
+        (№приказа_дата_ФИО_примечание.pdf); недостающий номер присваивается
+        автоматически, дата — текущая;
+      - дубликаты (тот же номер либо дата+ФИО) пропускаются;
+      - столбец «Наименование приказа» из CSV-реестра и шаблонов Excel не
+        используется: наименование всегда выбирается на странице загрузки.
+    """
+    if journal not in JOURNAL_TYPES:
+        abort(404)
+    user = current_user()
+    if not can_access_journal(user, journal):
+        abort(403)
+    type_id = request.form.get('order_type_id', type=int)
+    spec_fio = request.form.get('specialist_fio', '').strip()
+    note_extra = request.form.get('note', '').strip()
+    mode = request.form.get('mode', 'auto')   # auto | new
+    files = request.files.getlist('files')
+    single = request.files.get('file')
+    if single and single.filename:
+        files.append(single)
+    if not files or not any(f.filename for f in files):
+        flash('Выберите файлы PDF или ZIP-архив с файлами PDF', 'err')
+        return redirect(url_for('journal_scans_page', journal=journal))
+
+    today = date.today().isoformat()
+    workdir = tempfile.mkdtemp(prefix='scans_')
+    items = []          # (имя_файла_без_расширения, путь_к_pdf_во_временном_каталоге)
+    errors = []
+    try:
+        import zipfile
+        for f in files:
+            fn = f.filename or ''
+            low = fn.lower()
+            if not (low.endswith('.pdf') or low.endswith('.zip')):
+                errors.append(f'«{os.path.basename(fn)}»: пропускается — не PDF/ZIP')
+                continue
+            tmp_path = os.path.join(workdir, secure_filename(fn) or 'f.bin')
+            f.save(tmp_path)
+            if low.endswith('.zip'):
+                try:
+                    with zipfile.ZipFile(tmp_path) as z:
+                        bad = [n for n in z.namelist()
+                               if not n.lower().endswith('.pdf') and not n.endswith('/')]
+                        if bad:
+                            errors.append(f'в архиве «{os.path.basename(fn)}» '\
+                                          f'пропущено не-PDF файлов: {len(bad)}')
+                        zdir = os.path.join(workdir, 'z_' + secure_filename(fn))
+                        os.makedirs(zdir, exist_ok=True)
+                        for n in z.namelist():
+                            if not n.lower().endswith('.pdf') or n.startswith('__MACOSX'):
+                                continue
+                            out = os.path.join(zdir, secure_filename(os.path.basename(n)))
+                            with z.open(n) as src, open(out, 'wb') as dst:
+                                shutil.copyfileobj(src, dst)
+                            items.append((os.path.splitext(os.path.basename(n))[0], out))
+                except zipfile.BadZipFile:
+                    errors.append(f'«{os.path.basename(fn)}»: повреждённый ZIP-архив')
+            else:
+                items.append((os.path.splitext(os.path.basename(fn))[0], tmp_path))
+
+        attached = created = skipped = 0
+        conn = get_db()
+        existing_nums = {}
+        existing_fp = set()
+        for r in conn.execute('SELECT o.id, o.order_number, o.order_date, o.person_fio, '
+                              'o.scan_path, t.name AS tname FROM orders o '
+                              'LEFT JOIN order_types t ON t.id=o.order_type_id '
+                              'WHERE o.journal=?', (journal,)):
+            key = _norm(r['order_number']).lower()
+            existing_nums.setdefault(key, []).append(r)
+            existing_fp.add((_norm(r['order_date']), _norm(r['tname']).lower(),
+                             _norm(r['person_fio']).lower()))
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        for stem, path in items:
+            meta = _parse_order_filename(stem)
+            num = meta['number']
+            dt = meta['date'] or today
+            person = meta['person']
+            note = meta['note']
+            if note_extra:
+                note = (note + '; ' + note_extra) if note else note_extra
+            has_suffix = '-' in num
+            if not has_suffix and num and num.split('-')[0].isdigit():
+                num += JOURNAL_SUFFIX[journal]
+            recs = existing_nums.get(_norm(num).lower(), []) if num else []
+            if mode != 'new' and recs:
+                rec = next((x for x in recs if not x['scan_path']), recs[0])
+                if rec['scan_path']:
+                    skipped += 1
+                    errors.append(f'«{stem}»: у приказа № {num} уже есть скан — пропущен')
+                    continue
+                fname = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(os.path.basename(path))}"
+                shutil.copy2(path, os.path.join(UPLOAD_DIR, fname))
+                conn.execute('UPDATE orders SET scan_path=? WHERE id=?', (fname, rec['id']))
+                conn.commit()
+                attached += 1
+                continue
+            if mode == 'new' and num:
+                num = next_order_number(conn, journal)
+            elif num and recs:
+                num = next_order_number(conn, journal)
+            elif not num:
+                num = next_order_number(conn, journal)
+            fp = (dt, '', _norm(person).lower())
+            if fp in existing_fp:
+                skipped += 1
+                errors.append(f'«{stem}»: дубликат ({dt} / {person}) — пропущен')
+                continue
+            fname = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(os.path.basename(path))}"
+            shutil.copy2(path, os.path.join(UPLOAD_DIR, fname))
+            conn.execute(
+                'INSERT INTO orders(journal, order_number, order_date, order_type_id, '
+                'person_fio, specialist_fio, note, scan_path) VALUES (?,?,?,?,?,?,?,?)',
+                (journal, num, dt, type_id, person, spec_fio, note, fname))
+            base = num.split('-')[0]
+            if base.isdigit():
+                conn.execute('UPDATE counters SET value=MAX(value,?) WHERE journal=?',
+                             (int(base), journal))
+            conn.commit()
+            existing_nums.setdefault(_norm(num).lower(), []).append(
+                {'id': None, 'order_number': num, 'order_date': dt,
+                 'person_fio': person, 'scan_path': fname, 'tname': ''})
+            existing_fp.add(fp)
+            created += 1
+        conn.close()
+        audit('ЗАГРУЗКА СКАНОВ PDF',
+              f'журнал={JOURNAL_TITLES.get(journal)}, приложено={attached}, '
+              f'создано={created}, пропущено={skipped}')
+        msg = (f'Загрузка завершена: сканов приложено — {attached}, '
+               f'приказов создано — {created}, пропущено — {skipped}')
+        if errors:
+            msg += '. Замечания: ' + '; '.join(errors[:8])
+        flash(msg, 'ok')
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+    return redirect(url_for('journal_list', journal=journal))
+
+
 @app.route('/order/<int:oid>/update', methods=['POST'])
 def order_update(oid):
     conn = get_db()
