@@ -64,8 +64,9 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.2.0'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
+APP_VERSION = '1.2.1'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
 # 1.2.0 — поле «Примечание» во всех приказах + загрузка сотрудников и видов приказов из Excel
+# 1.2.1 — куратору разрешено редактирование справочника «Виды приказов»
 
 
 def setup_logging():
@@ -304,6 +305,12 @@ def is_admin(user=None):
     return bool(user) and user['role_name'] == 'Администратор'
 
 
+def can_edit_order_types(user=None):
+    """Справочник «Виды приказов» могут редактировать Администратор и Куратор."""
+    user = user or current_user()
+    return bool(user) and user['role_name'] in ('Администратор', 'Куратор')
+
+
 def can_access_journal(user, journal):
     if not user:
         return False
@@ -480,7 +487,8 @@ def order_types():
 @app.route('/order_types/save', methods=['POST'])
 def order_type_save():
     user = current_user()
-    if not is_admin(user):
+    # Разрешено Администратору и Куратору (куратор ведёт справочник видов приказов)
+    if not can_edit_order_types(user):
         abort(403)
     tid = request.form.get('id', type=int)
     kind = request.form.get('kind', 'opeka')
@@ -510,7 +518,9 @@ def order_type_save():
 
 @app.route('/order_types/delete/<int:tid>', methods=['POST'])
 def order_type_delete(tid):
-    if not is_admin():
+    # Разрешено Администратору и Куратору; удаление по-прежнему блокируется,
+    # если вид приказа используется в документах журналов.
+    if not can_edit_order_types():
         abort(403)
     conn = get_db()
     used = conn.execute('SELECT COUNT(*) c FROM orders WHERE order_type_id=?', (tid,)).fetchone()['c']
@@ -718,13 +728,13 @@ def order_types_template():
 
 @app.route('/order_types/import', methods=['POST'])
 def order_types_import():
-    """Массовая загрузка видов приказов из Excel (.xlsx). Только Администратор.
+    """Массовая загрузка видов приказов из Excel (.xlsx). Администратор и Куратор.
 
     Столбец «Вид приказа» — название журнала (Опека / Нуждаемость / Профилактика),
     дубликаты пар (вид+наименование) пропускаются.
     """
     user = current_user()
-    if not is_admin(user):
+    if not can_edit_order_types(user):
         abort(403)
     _need_xlsx()
     f = request.files.get('file')
