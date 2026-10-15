@@ -63,7 +63,7 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.1.0'  # 1.1.0 — самостоятельная смена пароля сотрудником
+APP_VERSION = '1.1.1'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError при сохранении вида приказа
 
 
 def setup_logging():
@@ -484,11 +484,13 @@ def order_type_save():
         else:
             conn.execute('INSERT INTO order_types(kind,name) VALUES (?,?)', (kind, name))
         conn.commit()
-        audit('ВИД ПРИКАЗА СОХРАНЁН', f'{journal}: {name}')
+        # в этой функции переменная называется kind (вид приказа), а не journal —
+        # исправлена ошибка NameError при аудите сохранения вида приказа
+        audit('ВИД ПРИКАЗА СОХРАНЁН', f'{JOURNAL_TITLES.get(kind, kind)}: {name}')
         flash('Вид приказа сохранён', 'ok')
     except sqlite3.IntegrityError:
         conn.rollback()
-        audit('ОШИБКА: ДУБЛЬ ВИДА ПРИКАЗА', f'{journal}: {name}')
+        audit('ОШИБКА: ДУБЛЬ ВИДА ПРИКАЗА', f'{JOURNAL_TITLES.get(kind, kind)}: {name}')
         flash('Такой вид приказа уже существует', 'err')
     finally:
         conn.close()

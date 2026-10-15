@@ -1,0 +1,14 @@
+nohup: ignoring input
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-10-15 09:16:45 | INFO     | Сервер запущен: http://0.0.0.0:8080 (версия 1.1.1, логи: /workspace/data/logs/app.log)
+Сервер запущен: http://0.0.0.0:8080  (логин: admin / admin)
+Журнал логирования: /workspace/data/logs/app.log
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://21.0.4.143:8080
+Press CTRL+C to quit
+2026-10-15 09:16:48 | INFO     | [HTTP] GET /login -> 200 (IP: 127.0.0.1, user_id: -)
+127.0.0.1 - - [15/Oct/2026 09:16:48] "GET /login HTTP/1.1" 200 -
