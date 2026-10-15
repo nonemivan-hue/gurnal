@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
-data/logs/
-*.log
-server.out
+data/*.db
 data/app.pid
+data/logs/
+server.out
+test_online*.py

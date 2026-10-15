@@ -6,7 +6,10 @@
 """
 import os
 import io
+import ast
 import json
+import hashlib
+import zlib
 import shutil
 import socket
 import sqlite3
@@ -66,10 +69,12 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.3.0'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
+APP_VERSION = '1.3.1'  # 1.1.0 — смена пароля сотрудником; 1.1.1 — исправлен NameError;
 # 1.2.0 — поле «Примечание» во всех приказах + загрузка сотрудников и видов приказов из Excel
 # 1.2.1 — куратору разрешено редактирование справочника «Виды приказов»
 # 1.2.2 — панель загрузки приказов в журналы из Excel + подробное описание обновления программы
+# 1.3.0 — роль «Начальник отдела» + обновление без выключения сервера
+# 1.3.1 — отображение активных пользователей в меню (Администратор, Куратор, Начальник отдела)
 
 
 def setup_logging():
@@ -160,6 +165,192 @@ def _load_or_create_secret():
 
 app.secret_key = _load_or_create_secret()
 
+# ------------------------------------------------------------- активные пользователи
+# Реестр активных сессий: user_id -> {'sid': подпись сессии, 'last_seen': unix-time}.
+# Заполняется при входе, обновляется на каждом запросе; запись удаляется при выходе.
+ACTIVE_SESSIONS = {}
+ACTIVE_SESSIONS_LOCK = threading.Lock()
+# Сессия считается активной, если пользователь действовал не более N секунд назад
+ACTIVE_TIMEOUT = int(os.environ.get('ACTIVE_TIMEOUT', '300'))  # 5 минут
+
+
+def _session_signature(uid):
+    """Подпись сессии пользователя из signed cookie (секрет известен серверу).
+    Совпадение подписи означает, что cookie принадлежит реальной активной
+    сессии данного пользователя (а не «протухшему» cookie после перезапуска)."""
+    raw = request.cookies.get(app.config['SESSION_COOKIE_NAME'], '')
+    if not raw:
+        return ''
+    try:
+        data = app.session_serializer.loads(raw)
+        if isinstance(data, dict) and data.get('user_id') == uid:
+            return hashlib.sha1(
+                json.dumps(data, sort_keys=True).encode('utf-8')).hexdigest()[:16]
+    except Exception:
+        pass
+    return ''
+
+
+# --- Хранение активных сессий в БД (переживает перезапуск/обновление сервера)
+def _db_touch_throttled(key, min_interval=10.0):
+    """True, если с момента последней записи в БД по ключу прошло >= min_interval сек.
+    Защита от лишней нагрузки: UPDATE в active_sessions выполняется не на каждый
+    HTTP-запрос, а не чаще одного раза в 10 секунд на сессию."""
+    now = time.time()
+    last = _DB_TOUCH_TS.get(key, 0)
+    if now - last >= min_interval:
+        _DB_TOUCH_TS[key] = now
+        return True
+    return False
+
+
+_DB_TOUCH_TS = {}  # {(uid, sid): unix-time последней записи в БД}
+
+
+def db_touch_active_session(uid, sid, ip):
+    """Записать/обновить отметку активности сессии в таблице active_sessions."""
+    try:
+        conn = get_db()
+        conn.execute(
+            'INSERT INTO active_sessions(user_id, sid, last_seen, ip) '
+            'VALUES(?,?,?,?) '
+            'ON CONFLICT(user_id, sid) DO UPDATE SET last_seen=excluded.last_seen, '
+            'ip=excluded.ip', (uid, sid or '', time.time(), ip or ''))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass  # реестр в памяти остаётся основным источником
+
+
+def db_drop_active_session(uid, sid=None):
+    """Удалить запись(и) о сессиях пользователя из таблицы БД."""
+    try:
+        conn = get_db()
+        if sid is not None:
+            conn.execute('DELETE FROM active_sessions WHERE user_id=? AND sid=?',
+                         (uid, sid or ''))
+        else:
+            conn.execute('DELETE FROM active_sessions WHERE user_id=?', (uid,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def db_cleanup_active_sessions(cutoff):
+    """Удалить из таблицы БД устаревшие отметки активности."""
+    try:
+        conn = get_db()
+        conn.execute('DELETE FROM active_sessions WHERE last_seen < ?', (cutoff,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def db_load_active_sessions(cutoff):
+    """Загрузить свежие сессии из таблицы БД: {(user_id, sid): {...}}.
+    Используется при старте приложения, чтобы список «Онлайн» восстановился
+    после перезапуска без потери информации об активных пользователях."""
+    result = {}
+    try:
+        conn = get_db()
+        for r in conn.execute('SELECT user_id, sid, last_seen, ip '
+                              'FROM active_sessions WHERE last_seen >= ?',
+                              (cutoff,)):
+            result[(r['user_id'], r['sid'])] = {'last_seen': r['last_seen'],
+                                                'ip': r['ip'] or ''}
+        conn.close()
+    except Exception:
+        pass
+    return result
+
+
+def restore_active_sessions():
+    """При старте процесса загрузить активные сессии из БД в память."""
+    loaded = db_load_active_sessions(time.time() - ACTIVE_TIMEOUT)
+    if loaded:
+        with ACTIVE_SESSIONS_LOCK:
+            ACTIVE_SESSIONS.update(loaded)
+    return len(loaded)
+
+
+def touch_active_session(uid):
+    """Отметить сессию пользователя как активную (вызывается на каждом запросе).
+    Ключ реестра — (user_id, подпись cookie-сессии), поэтому несколько устройств
+    или вкладок одного сотрудника учитываются раздельно.
+    Дополнительно запись дублируется в таблицу active_sessions (БД) — это даёт
+    возможность видеть активных пользователей сразу после перезапуска сервера."""
+    sid = _session_signature(uid)
+    ip = request.remote_addr if has_request_context_safe() else ''
+    now = time.time()
+    with ACTIVE_SESSIONS_LOCK:
+        ACTIVE_SESSIONS[(uid, sid)] = {'last_seen': now, 'ip': ip}
+    # в БД пишем не на каждый запрос, а не чаще раза в 10 секунд на сессию
+    if _db_touch_throttled((uid, sid)):
+        db_touch_active_session(uid, sid, ip)
+
+
+def drop_active_session(uid, sid=None):
+    """Убрать сессию из реестра (выход / истечение срока)."""
+    with ACTIVE_SESSIONS_LOCK:
+        if sid is not None:
+            ACTIVE_SESSIONS.pop((uid, sid), None)
+            _DB_TOUCH_TS.pop((uid, sid), None)
+        else:  # сбрасываем все сессии данного пользователя
+            for key in [k for k in ACTIVE_SESSIONS if k[0] == uid]:
+                del ACTIVE_SESSIONS[key]
+                _DB_TOUCH_TS.pop(key, None)
+    db_drop_active_session(uid, sid)
+
+
+def cleanup_active_sessions():
+    """Удалить из реестра записи, превысившие срок неактивности
+    (как из памяти, так и из таблицы БД active_sessions)."""
+    cutoff = time.time() - ACTIVE_TIMEOUT
+    with ACTIVE_SESSIONS_LOCK:
+        expired = [k for k, v in ACTIVE_SESSIONS.items()
+                   if v['last_seen'] < cutoff]
+        for k in expired:
+            del ACTIVE_SESSIONS[k]
+    db_cleanup_active_sessions(cutoff)
+
+
+def get_active_users():
+    """Список активных пользователей (свежие сессии за последние ACTIVE_TIMEOUT сек):
+    [{'id','full_name','role_name','ip','seconds_ago'}] — сортировка по ФИО.
+    Если у сотрудника несколько активных сессий, показывается самая свежая."""
+    cleanup_active_sessions()
+    with ACTIVE_SESSIONS_LOCK:
+        items = [(k[0], dict(v)) for k, v in ACTIVE_SESSIONS.items()]
+    if not items:
+        return []
+    # самая свежая сессия для каждого пользователя
+    best = {}
+    for uid, v in items:
+        if uid not in best or v['last_seen'] > best[uid]['last_seen']:
+            best[uid] = v
+    ids = list(best.keys())
+    conn = get_db()
+    qmarks = ','.join('?' * len(ids))
+    rows = {r['id']: r for r in conn.execute(
+        f'SELECT e.id, e.full_name, r.name AS role_name FROM employees e '
+        f'LEFT JOIN roles r ON r.id=e.role_id WHERE e.id IN ({qmarks})',
+        ids)}
+    conn.close()
+    now = time.time()
+    result = []
+    for u, v in best.items():
+        row = rows.get(u)
+        if not row:
+            continue
+        result.append({'id': u, 'full_name': row['full_name'],
+                       'role_name': row['role_name'] or '—',
+                       'ip': v.get('ip', ''),
+                       'seconds_ago': int(now - v['last_seen'])})
+    result.sort(key=lambda x: x['full_name'])
+    return result
+
 
 @app.after_request
 def log_request(response):
@@ -228,6 +419,13 @@ CREATE TABLE IF NOT EXISTS counters (
     journal TEXT PRIMARY KEY,
     value INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS active_sessions (
+    user_id INTEGER NOT NULL,
+    sid TEXT NOT NULL DEFAULT '',      -- подпись cookie-сессии
+    last_seen REAL NOT NULL,           -- unix-time последней активности
+    ip TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (user_id, sid)
+);                     -- реестр активных пользователей (переживает перезапуск)
 """
 
 
@@ -289,6 +487,10 @@ def write_version_file():
 
 init_db()
 write_version_file()
+# Восстанавливаем реестр активных пользователей из БД после перезапуска/обновления
+_n_restored = restore_active_sessions()
+if _n_restored:
+    log.info(f'[HTTP] Восстановлено активных сессий из БД: {_n_restored}')
 
 # ---------------------------------------------------------------- auth
 
@@ -352,12 +554,19 @@ def _guard():
         return
     if not session.get('user_id'):
         return redirect(url_for('login'))
+    # отмечаем сессию пользователя активной (для счётчика «онлайн» в меню)
+    touch_active_session(session['user_id'])
 
 
 @app.context_processor
 def inject_globals():
     user = current_user()
     journals = [j for j in JOURNAL_TYPES if user and can_access_journal(user, j)]
+    # Активные пользователи — видны Администратору, Куратору и Начальнику отдела
+    active_users = None
+    if user and user['role_name'] in ('Администратор', 'Куратор',
+                                      'Начальник отдела'):
+        active_users = get_active_users()
     return dict(
         cu=user,
         accessible_journals=[(j, JOURNAL_TITLES[j]) for j in journals],
@@ -365,6 +574,8 @@ def inject_globals():
         journal_titles=JOURNAL_TITLES,
         all_roles=ALL_ROLES,
         app_version=APP_VERSION,
+        active_users=active_users,
+        active_timeout=ACTIVE_TIMEOUT,
     )
 
 # ---------------------------------------------------------------- login
@@ -397,7 +608,10 @@ def login():
 
 @app.route('/logout')
 def logout():
+    uid = session.get('user_id')
     audit('ВЫХОД ИЗ СИСТЕМЫ')
+    if uid:  # убираем пользователя из реестра активных сессий
+        drop_active_session(uid, _session_signature(uid))
     session.clear()
     return redirect(url_for('login'))
 
@@ -1919,6 +2133,22 @@ def service_update():
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return redirect(url_for('service'))
+
+
+# ------------------------------------------------- активные пользователи (API)
+
+@app.route('/api/active_users')
+def api_active_users():
+    """JSON со списком активных пользователей для меню «👥 Онлайн».
+    Доступ: Администратор, Куратор, Начальник отдела."""
+    user = current_user()
+    if not user or user['role_name'] not in ('Администратор', 'Куратор',
+                                             'Начальник отдела'):
+        abort(403)
+    users = get_active_users()
+    return Response(json.dumps({'timeout': ACTIVE_TIMEOUT, 'users': users},
+                                ensure_ascii=False),
+                    mimetype='application/json')
 
 # ---------------------------------------------------------------- profile / password
 
