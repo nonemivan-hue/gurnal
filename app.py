@@ -2102,12 +2102,21 @@ def report_journal_print():
     # выборка по виду приказа; сортировка: по дате, внутри даты — по номеру
     rows = _query_report_rows_sorted_asc(d1, d2, journal=journal)
     title = f'Журнал «{JOURNAL_TITLES[journal]}» за период'
+    # для журнала «Опека»: наименование приказа = вид приказа + (причина из справочника);
+    # для «Нуждаемость» и «Профилактика» — только наименование приказа
+    with_reason = REASONS_ENABLED.get(journal, False)
     data = []
     for i, r in enumerate(rows, 1):
-        # примечание — отдельным столбцом (по ТЗ); наименование — только приказ
+        # примечание — отдельным столбцом (по ТЗ)
         note = r['note'] if 'note' in r.keys() else ''
+        name = r['type_name'] or ''
+        reason = ''
+        if with_reason and 'reason_name' in r.keys():
+            reason = r['reason_name'] or ''
+        if reason:
+            name = f'{name} ({reason})' if name else f'({reason})'
         data.append((i, r['order_number'], r['order_date'], r['person_fio'],
-                     r['type_name'] or '', r['specialist_fio'], note))
+                     name, r['specialist_fio'], note))
     headers = ('№ п/п', '№ приказа', 'Дата', 'Ф.И.О.',
                'Наименование приказа', 'ФИО специалиста', 'Примечание')
     fmt = request.args.get('fmt')
@@ -2514,11 +2523,20 @@ def api_report_journal_print():
         abort(404)
     d1, d2 = _report_period()
     rows = _query_report_rows_sorted_asc(d1, d2, journal=journal)
+    # та же логика, что и в веб-отчёте: Опека — наименование + (причина),
+    # Нуждаемость/Профилактика — только наименование приказа
+    with_reason = REASONS_ENABLED.get(journal, False)
     data = []
     for i, r in enumerate(rows, 1):
         note = r['note'] if 'note' in r.keys() else ''
+        name = r['type_name'] or ''
+        reason = ''
+        if with_reason and 'reason_name' in r.keys():
+            reason = r['reason_name'] or ''
+        if reason:
+            name = f'{name} ({reason})' if name else f'({reason})'
         data.append({'n': i, 'number': r['order_number'], 'date': r['order_date'],
-                     'fio': r['person_fio'], 'name': r['type_name'] or '',
+                     'fio': r['person_fio'], 'name': name,
                      'specialist': r['specialist_fio'], 'note': note})
     return api_json({'d1': d1, 'd2': d2, 'journal': journal,
                      'title': f'Журнал «{JOURNAL_TITLES[journal]}» за период',
