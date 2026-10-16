@@ -543,6 +543,13 @@ CREATE TABLE IF NOT EXISTS active_sessions (
     ip TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (user_id, sid)
 );                     -- реестр активных пользователей (переживает перезапуск)
+CREATE TABLE IF NOT EXISTS user_prefs (
+    user_id INTEGER NOT NULL REFERENCES employees(id),
+    key TEXT NOT NULL,                 -- напр. journal_period.opeka
+    value TEXT NOT NULL DEFAULT '',    -- сериализованный JSON
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, key)
+);                     -- персональные настройки пользователей (сохраняются между сессиями)
 """
 
 
@@ -1196,6 +1203,54 @@ def next_order_number(conn, journal):
     return f"{row['value']}{journal_prefix(conn, journal)}"
 
 
+def _valid_iso_date(s):
+    """Проверка строки формата ГГГГ-ММ-ДД; None — некорректная дата."""
+    try:
+        d = date.fromisoformat((s or '').strip())
+        return d.isoformat()
+    except (ValueError, TypeError):
+        return None
+
+
+def pref_get(conn, user_id, key, default=None):
+    """Персональная настройка пользователя (JSON в таблице user_prefs)."""
+    row = conn.execute('SELECT value FROM user_prefs WHERE user_id=? AND key=?',
+                       (user_id, key)).fetchone()
+    if not row:
+        return default
+    try:
+        return json.loads(row['value'])
+    except (ValueError, TypeError):
+        return default
+
+
+def pref_set(conn, user_id, key, value):
+    """Сохранить персональную настройку пользователя (сериализует в JSON)."""
+    conn.execute('INSERT INTO user_prefs(user_id, key, value, updated_at) '
+                 'VALUES (?,?,?,CURRENT_TIMESTAMP) '
+                 'ON CONFLICT(user_id, key) DO UPDATE SET '
+                 'value=excluded.value, updated_at=CURRENT_TIMESTAMP',
+                 (user_id, key, json.dumps(value, ensure_ascii=False)))
+
+
+def journal_period(conn, user_id, journal, args):
+    """Период отображения журнала: из параметров запроса (?d1&?d2), иначе —
+    сохранённый ранее для данного пользователя. Значения сохраняются в БД."""
+    key = f'journal_period.{journal}'
+    raw1 = (args.get('d1') or '').strip()
+    raw2 = (args.get('d2') or '').strip()
+    if 'd1' in args or 'd2' in args:   # форма периода отправлялась (в т.ч. сброс)
+        d1 = _valid_iso_date(raw1)
+        d2 = _valid_iso_date(raw2)
+        pref_set(conn, user_id, key, {'d1': d1 or '', 'd2': d2 or ''})
+        conn.commit()
+    else:
+        saved = pref_get(conn, user_id, key, {}) or {}
+        d1 = _valid_iso_date(saved.get('d1'))
+        d2 = _valid_iso_date(saved.get('d2'))
+    return d1, d2
+
+
 @app.route('/journal/<journal>')
 def journal_list(journal):
     if journal not in JOURNAL_TYPES:
@@ -1205,9 +1260,17 @@ def journal_list(journal):
         abort(403)
     q = request.args.get('q', '').strip()
     conn = get_db()
+    # отбор по периоду (сохраняется отдельно для каждого пользователя)
+    p1, p2 = journal_period(conn, user['id'], journal, request.args)
     sql = ('SELECT o.*, t.name AS type_name FROM orders o '
            'LEFT JOIN order_types t ON t.id=o.order_type_id WHERE o.journal=?')
     params = [journal]
+    if p1:
+        sql += ' AND o.order_date>=?'
+        params.append(p1)
+    if p2:
+        sql += ' AND o.order_date<=?'
+        params.append(p2)
     if q:
         sql += ' AND (o.order_number LIKE ? OR o.person_fio LIKE ? OR o.specialist_fio LIKE ?)'
         like = f'%{q}%'
@@ -1221,7 +1284,7 @@ def journal_list(journal):
     today = date.today().isoformat()
     conn.close()
     return render_template('journal.html', journal=journal, title=JOURNAL_TITLES[journal],
-                           rows=rows, types=types, today=today, q=q)
+                           rows=rows, types=types, today=today, q=q, p1=p1, p2=p2)
 
 
 @app.route('/journal/<journal>/api/next_number')
@@ -1759,6 +1822,58 @@ def order_delete(oid):
     audit('ПРИКАЗ УДАЛЁН', f'id={oid}')
     flash('Приказ удалён', 'ok')
     return redirect(url_for('journal_list', journal=journal))
+
+
+@app.route('/journal/<journal>/delete_bulk', methods=['POST'])
+def journal_delete_bulk(journal):
+    """Массовое удаление выделенных в журнале приказов (чекбоксы строк)."""
+    if journal not in JOURNAL_TYPES:
+        abort(404)
+    user = current_user()
+    if not can_access_journal(user, journal):
+        abort(403)
+    ids = []
+    for v in request.form.getlist('ids'):
+        try:
+            ids.append(int(v))
+        except (ValueError, TypeError):
+            abort(400)
+    if not ids:
+        flash('Не выбран ни один приказ для удаления', 'err')
+        return redirect(url_for('journal_list', journal=journal))
+    conn = get_db()
+    marks = ','.join('?' * len(ids))
+    rows = conn.execute(f'SELECT id, scan_path FROM orders WHERE journal=? AND id IN ({marks})',
+                        [journal] + ids).fetchall()
+    deleted = 0
+    for r in rows:
+        if r['scan_path'] and os.path.exists(os.path.join(UPLOAD_DIR, r['scan_path'])):
+            try:
+                os.remove(os.path.join(UPLOAD_DIR, r['scan_path']))
+            except OSError:
+                pass
+    if rows:
+        conn.execute(f'DELETE FROM orders WHERE journal=? AND id IN ({marks})',
+                     [journal] + ids)
+        conn.commit()
+        deleted = len(rows)
+    skipped = len(ids) - deleted
+    conn.close()
+    if deleted:
+        audit('ПРИКАЗЫ УДАЛЕНЫ МАССОВО', f'журнал={journal} count={deleted} ids={ids}')
+        msg = f'Удалено приказов: {deleted}'
+        if skipped > 0:
+            msg += f', пропущено (не найдены или из другого журнала): {skipped}'
+        flash(msg, 'ok')
+    else:
+        flash('Удалять нечего: приказы не найдены', 'err')
+    # возвращаемся с текущим фильтром по периоду и поиском
+    qs = {}
+    for a in ('d1', 'd2', 'q'):
+        v = request.args.get(a, '').strip()
+        if v:
+            qs[a] = v
+    return redirect(url_for('journal_list', journal=journal, **qs))
 
 
 @app.route('/order/<int:oid>/scan')
