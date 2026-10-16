@@ -86,3 +86,17 @@ th.sortable:hover{background:#dbe6f2;}
 th.sortable .sort-ind{color:#1c3f63;font-size:11px;margin-left:4px;}
 #filterCount{margin-left:8px;color:#1c3f63;}
 @media print{.filter-row{display:none!important;}}
+
+/* ===== Отбор журнала по периоду (сохраняется для пользователя) ===== */
+.periodbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:6px 0 10px 0;}
+.periodbar label{font-size:14px;display:inline-flex;align-items:center;gap:6px;}
+.periodbar input[type=date]{padding:4px 8px;border:1px solid #c6d2e0;border-radius:6px;font-size:14px;}
+
+/* ===== Выделение строк и массовое удаление ===== */
+.chk-col{width:28px;text-align:center;padding:4px 6px!important;}
+.row-check{cursor:pointer;width:15px;height:15px;accent-color:#1c3f63;}
+#journalTable tr.selected{background:#e7f0fa;}
+.bulkbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#eef4fa;
+         border:1px solid #c6d2e0;border-radius:8px;padding:8px 12px;margin:8px 0;}
+.bulkbar[hidden]{display:none;}
+@media print{.periodbar,.bulkbar,.chk-col,.row-check{display:none!important;}}

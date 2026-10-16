@@ -40,27 +40,60 @@
   <span class="hint" id="filterCount"></span>
 </form>
 
+{# отбор по периоду: сохраняется отдельно для каждого пользователя #}
+<form method="get" class="periodbar no-print" id="periodForm">
+  {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+  <label>С даты <input type="date" name="d1" id="p_d1" value="{{ p1 or '' }}"></label>
+  <label>По дату <input type="date" name="d2" id="p_d2" value="{{ p2 or '' }}"></label>
+  <button class="btn" type="submit">📅 Применить период</button>
+  {% if p1 or p2 %}<a class="btn" href="{{ url_for('journal_list', journal=journal, q=q or '') }}">✕ Сбросить период</a>{% endif %}
+  <span class="hint">период сохраняется для вашего пользователя</span>
+</form>
+
+{# панель массового удаления: появляется при выделении строк чекбоксами #}
+<div class="bulkbar no-print" id="bulkBar" hidden>
+  <span>Выделено: <b id="selCount">0</b></span>
+  <button class="btn sm" type="button" onclick="selectAllRows(true)">Выделить все</button>
+  <button class="btn sm" type="button" onclick="selectAllRows(false)">Снять выделение</button>
+  <button class="btn sm danger" type="button" onclick="bulkDelete()">🗑 Удалить выделенные</button>
+</div>
+
+<form method="post" id="bulkForm" class="no-print" style="display:none"
+      action="{{ url_for('journal_delete_bulk', journal=journal) }}"
+      onsubmit="return confirmBulk(event)">
+  <input type="hidden" name="d1" value="{{ p1 or '' }}">
+  <input type="hidden" name="d2" value="{{ p2 or '' }}">
+  {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+</form>
+
 <table class="grid" id="journalTable">
   {# заголовки: клик по столбцу — сортировка (по дате и номеру — с учётом числовых значений) #}
   <tr>
+    <th class="chk-col no-print"><input type="checkbox" id="chkAll" title="Выделить все строки"
+        onclick="toggleAllChecked(this.checked)"></th>
     {% for h in ['№ п/п','№ приказа','Дата','Наименование приказа','Ф.И.О. в отношении кого','ФИО специалиста','Примечание','Скан'] %}
-    <th class="sortable" data-sortcol="{{ loop.index0 }}" onclick="sortByColumn(this)"
+    <th class="sortable" data-sortcol="{{ loop.index0 + 1 }}" onclick="sortByColumn(this)"
         title="Сортировать по столбцу «{{ h }}»">{{ h }}<span class="sort-ind"></span></th>
     {% endfor %}
     <th class="no-print"></th>
   </tr>
   {# строка фильтрации-воронки для каждого столбца #}
   <tr class="filter-row no-print">
+    <th class="no-print"></th>
     {% for h in ['№ п/п','№ приказа','Дата','Наименование приказа','Ф.И.О. в отношении кого','ФИО специалиста','Примечание','Скан'] %}
     <th class="filter-cell">
       <span class="funnel" onclick="toggleFilter(this)" title="Фильтр по столбцу «{{ h }}»">⏷</span>
-      <input type="search" class="col-filter" data-col="{{ loop.index0 }}" placeholder="фильтр…" hidden>
+      <input type="search" class="col-filter" data-col="{{ loop.index0 + 1 }}" placeholder="фильтр…" hidden>
     </th>
     {% endfor %}
     <th class="no-print"></th>
   </tr>
   {% for r in rows %}
-  <tr>
+  <tr{% if r.scan_path %} data-has-scan="1"{% endif %}>
+    <td class="chk-col no-print">
+      <input type="checkbox" class="row-check" value="{{ r.id }}"
+             data-number="{{ r.order_number }}" onchange="onRowCheckChange()">
+    </td>
     <td>{{ loop.index }}</td>
     <td>{{ r.order_number }}</td>
     <td>{{ r.order_date }}</td>
@@ -79,7 +112,7 @@
     </td>
   </tr>
   {% endfor %}
-  {% if not rows %}<tr class="empty-row"><td colspan="9" class="empty">Нет записей</td></tr>{% endif %}
+  {% if not rows %}<tr class="empty-row"><td colspan="10" class="empty">Нет записей</td></tr>{% endif %}
 </table>
 
 <div class="panel" id="editPanel" style="display:none">
@@ -196,5 +229,69 @@ function sortByColumn(th){
   const ind = th.querySelector('.sort-ind');
   if(ind) ind.textContent = sortState.dir === 1 ? ' ▲' : ' ▼';
 }
+
+// ===== Выделение строк и массовое удаление =====
+function visibleRowChecks(){
+  return [...document.querySelectorAll('#journalTable .row-check')]
+    .filter(cb => cb.closest('tr').style.display !== 'none');
+}
+
+function checkedRows(){
+  return visibleRowChecks().filter(cb => cb.checked);
+}
+
+function updateBulkBar(){
+  const n = checkedRows().length;
+  const bar = document.getElementById('bulkBar');
+  const cnt = document.getElementById('selCount');
+  if(cnt) cnt.textContent = n;
+  if(bar) bar.hidden = (n === 0);
+  const all = visibleRowChecks();
+  const chkAll = document.getElementById('chkAll');
+  if(chkAll) chkAll.checked = all.length > 0 && n === all.length;
+  // подсветка выделенных строк
+  document.querySelectorAll('#journalTable tbody tr, #journalTable tr').forEach(tr => {
+    const cb = tr.querySelector && tr.querySelector('.row-check');
+    if(cb) tr.classList.toggle('selected', cb.checked);
+  });
+}
+
+function onRowCheckChange(){ updateBulkBar(); }
+
+function toggleAllChecked(v){
+  visibleRowChecks().forEach(cb => cb.checked = v);
+  updateBulkBar();
+}
+
+function selectAllRows(v){ toggleAllChecked(v); }
+
+function bulkDelete(){
+  const sel = checkedRows();
+  if(!sel.length){ alert('Сначала выделите приказы (чекбоксы слева от строк).'); return; }
+  const form = document.getElementById('bulkForm');
+  form.querySelectorAll('input[name="ids"]').forEach(i => i.remove());
+  for(const cb of sel){
+    const i = document.createElement('input');
+    i.type = 'hidden'; i.name = 'ids'; i.value = cb.value;
+    form.appendChild(i);
+  }
+  form.requestSubmit(); // сработает onsubmit -> confirmBulk
+}
+
+let bulkConfirmed = false;
+function confirmBulk(ev){
+  if(bulkConfirmed){ bulkConfirmed = false; return true; } // повторный submit — без подтверждения
+  ev.preventDefault();
+  const sel = checkedRows();
+  const nums = sel.slice(0, 5).map(cb => cb.dataset.number).join(', ');
+  const more = sel.length > 5 ? ' …' : '';
+  const scans = sel.filter(cb => cb.closest('tr').dataset.hasScan).length;
+  let msg = `Удалить выделенные приказы (${sel.length}): ${nums}${more}?`;
+  if(scans) msg += `\nВнимание: у ${scans} из них будут удалены и файлы сканов.`;
+  if(confirm(msg)){ bulkConfirmed = true; document.getElementById('bulkForm').requestSubmit(); }
+  return false;
+}
+
+updateBulkBar();
 </script>
 {% endblock %}
