@@ -41,8 +41,14 @@
 </form>
 
 <table class="grid" id="journalTable">
-  <tr><th>№ п/п</th><th>№ приказа</th><th>Дата</th><th>Наименование приказа</th>
-      <th>Ф.И.О. в отношении кого</th><th>ФИО специалиста</th><th>Примечание</th><th>Скан</th><th class="no-print"></th></tr>
+  {# заголовки: клик по столбцу — сортировка (по дате и номеру — с учётом числовых значений) #}
+  <tr>
+    {% for h in ['№ п/п','№ приказа','Дата','Наименование приказа','Ф.И.О. в отношении кого','ФИО специалиста','Примечание','Скан'] %}
+    <th class="sortable" data-sortcol="{{ loop.index0 }}" onclick="sortByColumn(this)"
+        title="Сортировать по столбцу «{{ h }}»">{{ h }}<span class="sort-ind"></span></th>
+    {% endfor %}
+    <th class="no-print"></th>
+  </tr>
   {# строка фильтрации-воронки для каждого столбца #}
   <tr class="filter-row no-print">
     {% for h in ['№ п/п','№ приказа','Дата','Наименование приказа','Ф.И.О. в отношении кого','ФИО специалиста','Примечание','Скан'] %}
@@ -73,7 +79,7 @@
     </td>
   </tr>
   {% endfor %}
-  {% if not rows %}<tr><td colspan="9" class="empty">Нет записей</td></tr>{% endif %}
+  {% if not rows %}<tr class="empty-row"><td colspan="9" class="empty">Нет записей</td></tr>{% endif %}
 </table>
 
 <div class="panel" id="editPanel" style="display:none">
@@ -143,5 +149,52 @@ function applyFilters(){
 document.addEventListener('input', e => {
   if(e.target.classList && e.target.classList.contains('col-filter')) applyFilters();
 });
+
+// ===== Сортировка журнала по столбцам =====
+let sortState = { col: null, dir: 1 }; // dir: 1 — по возрастанию, -1 — по убыванию
+
+// Ключ сравнения: числа извлекаются из текста и сравниваются как числа
+// (корректный порядок для дат ГГГГ-ММ-ДД и номеров вида «12а», «105»);
+// остальной текст сравнивается без учёта регистра.
+function sortKey(text){
+  const t = text.trim().toLowerCase().replace(/[\u25b2\u25bc]/g, '').trim();
+  return t.split(/(\d+)/).map(p => /^\d+$/.test(p) ? Number(p) : p);
+}
+
+function cmpKeys(a, b){
+  const n = Math.max(a.length, b.length);
+  for(let i = 0; i < n; i++){
+    const x = a[i], y = b[i];
+    if(x === undefined) return -1;
+    if(y === undefined) return 1;
+    if(typeof x === 'number' && typeof y === 'number'){ if(x !== y) return x - y; }
+    else if(typeof x === 'number'){ return 1; }   // цифры после букв («а» < «12»)
+    else if(typeof y === 'number'){ return -1; }
+    else { if(x !== y) return x < y ? -1 : 1; }
+  }
+  return 0;
+}
+
+function sortByColumn(th){
+  const table = document.getElementById('journalTable');
+  const col = +th.dataset.sortcol;
+  // повторный клик по тому же столбцу — обратный порядок
+  sortState.dir = (sortState.col === col) ? -sortState.dir : 1;
+  sortState.col = col;
+
+  const allRows = [...table.querySelectorAll('tr')].filter(tr =>
+    !tr.querySelector('th') && tr.children.length > 1);
+  const dataRows = allRows.filter(tr => !tr.classList.contains('empty-row'));
+  dataRows.sort((r1, r2) =>
+    sortState.dir * cmpKeys(sortKey(r1.children[col].textContent),
+                            sortKey(r2.children[col].textContent)));
+  const tbody = table.tBodies[0] || table;
+  dataRows.forEach(tr => tbody.appendChild(tr));
+
+  // индикаторы направления в заголовках
+  table.querySelectorAll('th.sortable .sort-ind').forEach(s => s.textContent = '');
+  const ind = th.querySelector('.sort-ind');
+  if(ind) ind.textContent = sortState.dir === 1 ? ' ▲' : ' ▼';
+}
 </script>
 {% endblock %}
