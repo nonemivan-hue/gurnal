@@ -79,7 +79,7 @@ def find_free_port(start):
                 continue
     return None
 
-APP_VERSION = '1.5.1'  # 1.5.0 — клиентское приложение; 1.5.1 — поддержка сборки PyInstaller
+APP_VERSION = '1.5.2'  # 1.5.0 — клиентское приложение; 1.5.1 — поддержка сборки PyInstaller
 # 1.2.0 — поле «Примечание» во всех приказах + загрузка сотрудников и видов приказов из Excel
 # 1.2.1 — куратору разрешено редактирование справочника «Виды приказов»
 # 1.2.2 — панель загрузки приказов в журналы из Excel + подробное описание обновления программы
@@ -90,6 +90,13 @@ APP_VERSION = '1.5.1'  # 1.5.0 — клиентское приложение; 1.
 # 1.4.1 — очистка журнала логирования администратором (режимы: с копией / только копия / полная)
 # 1.5.0 — настраиваемый префикс номера приказа по каждому виду приказа
 #         (справочник «Виды приказов» -> колонка «Префикс номера», пример: 1-ОП)
+# 1.5.1 — поддержка сборки PyInstaller (Windows / ALT Linux)
+# 1.5.2 — фильтры-воронки и сортировка по столбцам в журналах; выделение и массовое
+#         удаление приказов; отбор по периоду с сохранением для пользователя;
+#         пакетная загрузка документов в сервисе; смена пароля пользователя администратором;
+#         справочник «Причины» + поле «Причина» в журнале «Опека»; новая логика отчёта
+#         «Распечатка журнала за период» (печать / Excel / Word, выборка по виду приказа,
+#         для «Опеки» наименование + причина в скобках)
 
 
 def setup_logging():
@@ -2102,12 +2109,21 @@ def report_journal_print():
     # выборка по виду приказа; сортировка: по дате, внутри даты — по номеру
     rows = _query_report_rows_sorted_asc(d1, d2, journal=journal)
     title = f'Журнал «{JOURNAL_TITLES[journal]}» за период'
+    # для журнала «Опека»: наименование приказа = вид приказа + (причина из справочника);
+    # для «Нуждаемость» и «Профилактика» — только наименование приказа
+    with_reason = REASONS_ENABLED.get(journal, False)
     data = []
     for i, r in enumerate(rows, 1):
-        # примечание — отдельным столбцом (по ТЗ); наименование — только приказ
+        # примечание — отдельным столбцом (по ТЗ)
         note = r['note'] if 'note' in r.keys() else ''
+        name = r['type_name'] or ''
+        reason = ''
+        if with_reason and 'reason_name' in r.keys():
+            reason = r['reason_name'] or ''
+        if reason:
+            name = f'{name} ({reason})' if name else f'({reason})'
         data.append((i, r['order_number'], r['order_date'], r['person_fio'],
-                     r['type_name'] or '', r['specialist_fio'], note))
+                     name, r['specialist_fio'], note))
     headers = ('№ п/п', '№ приказа', 'Дата', 'Ф.И.О.',
                'Наименование приказа', 'ФИО специалиста', 'Примечание')
     fmt = request.args.get('fmt')
@@ -2514,11 +2530,20 @@ def api_report_journal_print():
         abort(404)
     d1, d2 = _report_period()
     rows = _query_report_rows_sorted_asc(d1, d2, journal=journal)
+    # та же логика, что и в веб-отчёте: Опека — наименование + (причина),
+    # Нуждаемость/Профилактика — только наименование приказа
+    with_reason = REASONS_ENABLED.get(journal, False)
     data = []
     for i, r in enumerate(rows, 1):
         note = r['note'] if 'note' in r.keys() else ''
+        name = r['type_name'] or ''
+        reason = ''
+        if with_reason and 'reason_name' in r.keys():
+            reason = r['reason_name'] or ''
+        if reason:
+            name = f'{name} ({reason})' if name else f'({reason})'
         data.append({'n': i, 'number': r['order_number'], 'date': r['order_date'],
-                     'fio': r['person_fio'], 'name': r['type_name'] or '',
+                     'fio': r['person_fio'], 'name': name,
                      'specialist': r['specialist_fio'], 'note': note})
     return api_json({'d1': d1, 'd2': d2, 'journal': journal,
                      'title': f'Журнал «{JOURNAL_TITLES[journal]}» за период',
