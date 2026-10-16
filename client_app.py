@@ -252,6 +252,26 @@ def _build_gui_classes():
                 self.cbo_type.current(sel)
             except ApiError as e:
                 messagebox.showerror('Справочник', str(e))
+            # выбор причины из справочника «Причины» (поле журнала «Опека»)
+            self.cbo_reason = None
+            self.reasons = []
+            if journal_key == 'opeka':
+                ttk.Label(frm, text='Причина:').grid(row=row, column=0, sticky='w')
+                self.cbo_reason = ttk.Combobox(frm, width=44, state='readonly')
+                self.cbo_reason.grid(row=row, column=1, sticky='we', pady=2)
+                row += 1
+                try:
+                    self.reasons = client.get('/api/v1/order_types?reasons=1')
+                    rnames = ['— не выбрана —'] + [r['name'] for r in self.reasons]
+                    self.cbo_reason['values'] = rnames
+                    rsel = 0
+                    if order and order.get('reason_id'):
+                        for i, r in enumerate(self.reasons, 1):
+                            if r['id'] == order['reason_id']:
+                                rsel = i
+                    self.cbo_reason.current(rsel)
+                except ApiError as e:
+                    messagebox.showerror('Справочник «Причины»', str(e))
             btns = ttk.Frame(frm)
             btns.grid(row=row, column=0, columnspan=2, pady=(12, 0))
             ttk.Button(btns, text='Сохранить', command=self.save).pack(side='left', padx=4)
@@ -261,6 +281,9 @@ def _build_gui_classes():
             data = {f: v.get().strip() for f, v in self.vars.items()}
             idx = self.cbo_type.current()
             data['order_type_id'] = self.types[idx - 1]['id'] if idx > 0 else None
+            if getattr(self, 'cbo_reason', None) is not None:
+                ridx = self.cbo_reason.current()
+                data['reason_id'] = self.reasons[ridx - 1]['id'] if ridx > 0 else None
             try:
                 if self.master_order_id:
                     self.saved = self.client.put(f"/api/v1/orders/{self.master_order_id}", data)
@@ -316,6 +339,11 @@ def _build_gui_classes():
                      'person': 'Ф.И.О.', 'spec': 'Специалист', 'scan': 'Скан', 'note': 'Примечание'}
             widths = {'order_number': 70, 'order_date': 90, 'type': 220, 'person': 240,
                       'spec': 200, 'scan': 50, 'note': 200}
+            # журнал «Опека»: столбец «Причина» (справочник «Причины»)
+            if self.current_journal() == 'opeka':
+                cols = cols[:6] + ('reason',) + cols[6:]
+                heads['reason'] = 'Причина'
+                widths['reason'] = 180
             self.tree = ttk.Treeview(body, columns=cols, show='tree headings', height=16)
             for c in cols:
                 self.tree.heading(c, text=heads[c])
@@ -364,11 +392,15 @@ def _build_gui_classes():
                 messagebox.showerror('Журнал', str(e))
                 return
             self.tree.delete(*self.tree.get_children())
+            has_reason = 'reason' in self.tree['columns']
             for r in self.rows:
-                self.tree.insert('', 'end', iid=str(r['id']), values=(
-                    r['order_number'], r['order_date'], r['order_type_name'] or '',
-                    r['person_fio'], r['specialist_fio'],
-                    'есть' if r['has_scan'] else '', r.get('note') or ''))
+                vals = [r['order_number'], r['order_date'], r['order_type_name'] or '',
+                        r['person_fio'], r['specialist_fio'],
+                        'есть' if r['has_scan'] else '']
+                if has_reason:
+                    vals.append(r.get('reason_name') or '')
+                vals.append(r.get('note') or '')
+                self.tree.insert('', 'end', iid=str(r['id']), values=vals)
             self.lbl_status.config(text=f'{self.cbo_journal.get()}: {len(self.rows)} записей')
 
         def selected_id(self):

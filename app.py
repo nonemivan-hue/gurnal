@@ -187,6 +187,39 @@ JOURNAL_SUFFIX = {  # суффикс номера приказа по умолч
     'nuzhdaemost': '-ну',
     'profilaktika': '-пр',
 }
+# Журнал, в котором у приказа есть поле «Причина» (данные — из справочника «Причины»)
+REASON_JOURNAL = 'opeka'
+REASONS_ENABLED = {j: (j == REASON_JOURNAL) for j in JOURNAL_TYPES}
+# Начальные значения справочника «Причины» (заполняется также при импорте Excel)
+REASON_DEMO = [
+    'Заявление гражданина',
+    'Выявление органом опеки и попечительства',
+    'Направление медицинской организации',
+    'Решение суда',
+    'Заявление законного представителя',
+]
+
+
+def _get_or_create_reason(conn, name):
+    """Идентификатор причины по наименованию из справочника «Причины».
+
+    Пустое значение -> None. Неизвестное наименование регистрируется в
+    справочнике автоматически (как это сделано для видов приказов).
+    """
+    name = _norm(name or '')
+    if not name:
+        return None
+    row = conn.execute('SELECT id FROM reasons WHERE LOWER(TRIM(name))=?',
+                       (name.lower(),)).fetchone()
+    if row:
+        return row['id']
+    try:
+        cur = conn.execute('INSERT INTO reasons(name) VALUES (?)', (name,))
+        return cur.lastrowid
+    except sqlite3.IntegrityError:
+        row = conn.execute('SELECT id FROM reasons WHERE LOWER(TRIM(name))=?',
+                           (name.lower(),)).fetchone()
+        return row['id'] if row else None
 
 
 def journal_prefix(conn, journal):
@@ -520,6 +553,10 @@ CREATE TABLE IF NOT EXISTS order_types (
     prefix TEXT NOT NULL DEFAULT '', -- префикс номера приказа для вида (напр. "ОП" -> 1-ОП)
     UNIQUE(kind, name)
 );
+CREATE TABLE IF NOT EXISTS reasons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL        -- справочник «Причины» (заполняется при импорте из Excel)
+);
 CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     journal TEXT NOT NULL,           -- opeka / nuzhdaemost / profilaktika
@@ -529,6 +566,7 @@ CREATE TABLE IF NOT EXISTS orders (
     person_fio TEXT NOT NULL DEFAULT '',   -- ФИО в отношении кого
     specialist_fio TEXT NOT NULL DEFAULT '', -- ФИО специалиста
     note TEXT NOT NULL DEFAULT '',         -- примечание (добавлено в 1.2.0)
+    reason_id INTEGER REFERENCES reasons(id), -- причина приказа (поле журнала «Опека»)
     scan_path TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -571,6 +609,9 @@ def init_db():
     tcols = [c['name'] for c in conn.execute('PRAGMA table_info(order_types)')]
     if 'prefix' not in tcols:
         conn.execute("ALTER TABLE order_types ADD COLUMN prefix TEXT NOT NULL DEFAULT ''")
+    # Миграция: колонка reason_id (причина приказа, журнал «Опека») + справочник «Причины»
+    if 'reason_id' not in ocols:
+        conn.execute('ALTER TABLE orders ADD COLUMN reason_id INTEGER REFERENCES reasons(id)')
     # seed roles
     for r in ALL_ROLES:
         conn.execute('INSERT OR IGNORE INTO roles(name) VALUES (?)', (r,))
@@ -600,6 +641,12 @@ def init_db():
             for n in names:
                 conn.execute('INSERT OR IGNORE INTO order_types(kind,name) VALUES (?,?)',
                              (kind, n))
+    # seed справочника «Причины» (поле «Причина» журнала «Опека») — только при пустом
+    # справочнике; значения также добавляются автоматически при импорте Excel
+    rseeded = conn.execute('SELECT COUNT(*) c FROM reasons').fetchone()['c']
+    if rseeded == 0:
+        for rn in REASON_DEMO:
+            conn.execute('INSERT OR IGNORE INTO reasons(name) VALUES (?)', (rn,))
     for j in JOURNAL_TYPES:
         conn.execute('INSERT OR IGNORE INTO counters(journal,value) VALUES (?,0)', (j,))
     conn.commit()
@@ -1191,7 +1238,15 @@ def _journal_key(raw, title_to_key):
 
 
 def _orders_xlsx_headers(journal):
-    """Заголовки столбцов для шаблона/импорта приказов конкретного журнала."""
+    """Заголовки столбцов для шаблона/импорта приказов конкретного журнала.
+
+    Для журнала «Опека» добавляется столбец «Причина» — данные берутся из
+    справочника «Причины» (неизвестные значения регистрируются в нём).
+    """
+    if REASONS_ENABLED.get(journal):
+        return ['№ приказа', 'Дата приказа', 'Вид приказа', 'Наименование приказа',
+                'Ф.И.О. в отношении кого приказ', 'ФИО специалиста',
+                'Причина', 'Примечание']
     return ['№ приказа', 'Дата приказа', 'Вид приказа', 'Наименование приказа',
             'Ф.И.О. в отношении кого приказ', 'ФИО специалиста', 'Примечание']
 
@@ -1269,8 +1324,9 @@ def journal_list(journal):
     conn = get_db()
     # отбор по периоду (сохраняется отдельно для каждого пользователя)
     p1, p2 = journal_period(conn, user['id'], journal, request.args)
-    sql = ('SELECT o.*, t.name AS type_name FROM orders o '
-           'LEFT JOIN order_types t ON t.id=o.order_type_id WHERE o.journal=?')
+    sql = ('SELECT o.*, t.name AS type_name, rs.name AS reason_name FROM orders o '
+           'LEFT JOIN order_types t ON t.id=o.order_type_id '
+           'LEFT JOIN reasons rs ON rs.id=o.reason_id WHERE o.journal=?')
     params = [journal]
     if p1:
         sql += ' AND o.order_date>=?'
@@ -1288,10 +1344,13 @@ def journal_list(journal):
     rows = conn.execute(sql, params).fetchall()
     types = conn.execute('SELECT * FROM order_types WHERE kind=? ORDER BY name',
                          (journal,)).fetchall()
+    # справочник «Причины» — используется только в журнале «Опека»
+    reasons = conn.execute('SELECT * FROM reasons ORDER BY name').fetchall()
     today = date.today().isoformat()
     conn.close()
     return render_template('journal.html', journal=journal, title=JOURNAL_TITLES[journal],
-                           rows=rows, types=types, today=today, q=q, p1=p1, p2=p2)
+                           rows=rows, types=types, reasons=reasons, today=today,
+                           q=q, p1=p1, p2=p2, has_reason=REASONS_ENABLED.get(journal, False))
 
 
 @app.route('/journal/<journal>/api/next_number')
@@ -1332,6 +1391,14 @@ def journal_create(journal):
     person_fio = request.form.get('person_fio', '').strip()
     specialist_fio = request.form.get('specialist_fio', '').strip()
     note = request.form.get('note', '').strip()          # примечание к приказу
+    # причина приказа (журнал «Опека») — берётся из справочника «Причины»
+    reason_id = None
+    if REASONS_ENABLED.get(journal):
+        rid = request.form.get('reason_id', type=int)
+        if rid and conn.execute('SELECT 1 FROM reasons WHERE id=?', (rid,)).fetchone():
+            reason_id = rid
+        else:
+            reason_id = _get_or_create_reason(conn, request.form.get('reason', ''))
     if type_id:
         ok = conn.execute('SELECT 1 FROM order_types WHERE id=? AND kind=?',
                           (type_id, journal)).fetchone()
@@ -1352,9 +1419,9 @@ def journal_create(journal):
         scan_rel = fname
     conn.execute(
         'INSERT INTO orders(journal, order_number, order_date, order_type_id, '
-        'person_fio, specialist_fio, note, scan_path) VALUES (?,?,?,?,?,?,?,?)',
+        'person_fio, specialist_fio, note, reason_id, scan_path) VALUES (?,?,?,?,?,?,?,?,?)',
         (journal, order_number, order_date, type_id, person_fio, specialist_fio,
-         note, scan_rel))
+         note, reason_id, scan_rel))
     conn.commit()
     conn.close()
     audit('ПРИКАЗ СОЗДАН', f'журнал={JOURNAL_TITLES.get(journal)}, №={order_number}, по кому={person_fio}')
@@ -1388,13 +1455,18 @@ def journal_template(journal):
     # примеры заполнения
     ws.append([f'{maxn + 1}{pfx}', date.today().isoformat(),
                JOURNAL_TITLES[journal], types[0]['name'] if types else 'Наименование приказа',
-               'Иванов Иван Иванович', 'Петров П. П.', 'Примечание (необязательно)'])
+               'Иванов Иван Иванович', 'Петров П. П.',
+               *( ['Заявление гражданина'] if REASONS_ENABLED.get(journal) else [] ),
+               'Примечание (необязательно)'])
     ws.append(['', '', JOURNAL_TITLES[journal],
                types[1]['name'] if len(types) > 1 else 'Другой приказ',
-               'Сидорова Анна Петровна', '', ''])
+               'Сидорова Анна Петровна', '',
+               *( ['Решение суда'] if REASONS_ENABLED.get(journal) else [] ),
+               ''])
     for c in ws[1]:
         c.font = Font(bold=True)
-    for col, w in zip('ABCDEFG', (12, 14, 16, 40, 32, 26, 30)):
+    widths = (12, 14, 16, 40, 32, 26, 30, 30)
+    for col, w in zip('ABCDEFGH', widths[:len(_orders_xlsx_headers(journal))]):
         ws.column_dimensions[col].width = w
     return _mem_xlsx(wb, f'шаблон_приказы_{journal}.xlsx')
 
@@ -1438,6 +1510,9 @@ def journal_import(journal):
                       'фио', 'фивоотношениикого')
     ci_spec = _pick(m, 'фиоспециалиста', 'специалист', 'фиоспеца')
     ci_note = _pick(m, 'примечание', 'комментарий', 'note')
+    # столбец «Причина» — только для журнала «Опека» (справочник «Причины»)
+    ci_reason = (_pick(m, 'причина', 'основание', 'reason')
+                 if REASONS_ENABLED.get(journal) else None)
     if ci_name is None and ci_person is None:
         flash('В файле не найдены столбцы «Наименование приказа» / «Ф.И.О. в отношении кого»', 'err')
         return redirect(url_for('journal_list', journal=journal))
@@ -1461,7 +1536,7 @@ def journal_import(journal):
         existing_fp.add((_norm(r['order_date']), _norm(r['tname']).lower(),
                          _norm(r['person_fio']).lower()))
 
-    def add_order(num, dt, tid, person, spec, note):
+    def add_order(num, dt, tid, person, spec, note, reason=None):
         nonlocal created, skipped
         fp = (dt, '', _norm(person).lower())
         type_name = ''
@@ -1475,8 +1550,8 @@ def journal_import(journal):
             return
         conn.execute(
             'INSERT INTO orders(journal, order_number, order_date, order_type_id, '
-            'person_fio, specialist_fio, note, scan_path) VALUES (?,?,?,?,?,?,?,?)',
-            (journal, num, dt, tid, person, spec, note, None))
+            'person_fio, specialist_fio, note, reason_id, scan_path) VALUES (?,?,?,?,?,?,?,?,?)',
+            (journal, num, dt, tid, person, spec, note, reason, None))
         existing_nums.add(num.lower())
         existing_fp.add(fp)
         base = num.split('-')[0]
@@ -1531,7 +1606,11 @@ def journal_import(journal):
                 num += journal_prefix(conn, journal)
         else:
             num = next_order_number(conn, journal)
-        add_order(num, dt, tid, person, cell(row, ci_spec), cell(row, ci_note))
+        # причина из столбца «Причина» (журнал «Опека») — регистрируется в справочнике
+        reason_id = (_get_or_create_reason(conn, cell(row, ci_reason))
+                     if ci_reason is not None else None)
+        add_order(num, dt, tid, person, cell(row, ci_spec), cell(row, ci_note),
+                  reason_id)
     conn.commit()
     conn.close()
     audit('ИМПОРТ ПРИКАЗОВ ИЗ EXCEL',
@@ -1779,6 +1858,15 @@ def order_update(oid):
     person_fio = request.form.get('person_fio', '').strip()
     specialist_fio = request.form.get('specialist_fio', '').strip()
     note = request.form.get('note', '').strip()          # примечание к приказу
+    # причина приказа (журнал «Опека») — берётся из справочника «Причины»
+    reason_id = row['reason_id'] if 'reason_id' in row.keys() else None
+    if REASONS_ENABLED.get(journal):
+        rid = request.form.get('reason_id', type=int)
+        if rid:
+            reason_id = rid if conn.execute('SELECT 1 FROM reasons WHERE id=?',
+                                            (rid,)).fetchone() else None
+        elif request.form.get('reason') is not None:
+            reason_id = _get_or_create_reason(conn, request.form.get('reason'))
     scan_rel = row['scan_path']
     f = request.files.get('scan')
     if f and f.filename:
@@ -1796,9 +1884,9 @@ def order_update(oid):
         scan_rel = fname
     conn.execute(
         'UPDATE orders SET order_number=?, order_date=?, order_type_id=?, '
-        'person_fio=?, specialist_fio=?, note=?, scan_path=? WHERE id=?',
+        'person_fio=?, specialist_fio=?, note=?, reason_id=?, scan_path=? WHERE id=?',
         (order_number, order_date, type_id, person_fio, specialist_fio,
-         note, scan_rel, oid))
+         note, reason_id, scan_rel, oid))
     conn.commit()
     conn.close()
     audit('ПРИКАЗ ИЗМЕНЁН', f'id={oid}')
@@ -1903,8 +1991,9 @@ def _report_period():
 
 def _query_report_rows(d1, d2, journal=None):
     conn = get_db()
-    sql = ('SELECT o.*, t.name AS type_name FROM orders o '
+    sql = ('SELECT o.*, t.name AS type_name, rs.name AS reason_name FROM orders o '
            'LEFT JOIN order_types t ON t.id=o.order_type_id '
+           'LEFT JOIN reasons rs ON rs.id=o.reason_id '
            'WHERE o.order_date>=? AND o.order_date<=?')
     params = [d1, d2]
     if journal:
@@ -1923,8 +2012,9 @@ def _query_report_rows_sorted_asc(d1, d2, journal=None):
     сначала дата приказа, внутри одной даты — номер (числовое сравнение:
     2 < 9 < 12 < 12а < 105). Используется в печати/выгрузке Excel и Word."""
     conn = get_db()
-    sql = ('SELECT o.*, t.name AS type_name FROM orders o '
+    sql = ('SELECT o.*, t.name AS type_name, rs.name AS reason_name FROM orders o '
            'LEFT JOIN order_types t ON t.id=o.order_type_id '
+           'LEFT JOIN reasons rs ON rs.id=o.reason_id '
            'WHERE o.order_date>=? AND o.order_date<=?')
     params = [d1, d2]
     if journal:
@@ -2072,14 +2162,21 @@ def api_json(obj, status=200):
 
 
 def _order_row_to_dict(r):
-    return {'id': r['id'], 'journal': r['journal'],
-            'order_number': r['order_number'], 'order_date': r['order_date'],
-            'order_type_id': r['order_type_id'],
-            'order_type_name': r['type_name'] if 'type_name' in r.keys() else None,
-            'person_fio': r['person_fio'], 'specialist_fio': r['specialist_fio'],
-            'note': r['note'] if 'note' in r.keys() else '',
-            'has_scan': bool(r['scan_path']),
-            'created_at': r['created_at'] if 'created_at' in r.keys() else ''}
+    keys = r.keys()
+    d = {'id': r['id'], 'journal': r['journal'],
+         'order_number': r['order_number'], 'order_date': r['order_date'],
+         'order_type_id': r['order_type_id'],
+         'order_type_name': r['type_name'] if 'type_name' in keys else None,
+         'person_fio': r['person_fio'], 'specialist_fio': r['specialist_fio'],
+         'note': r['note'] if 'note' in keys else '',
+         'has_scan': bool(r['scan_path']),
+         'created_at': r['created_at'] if 'created_at' in keys else ''}
+    # причина приказа (поле журнала «Опека», справочник «Причины»)
+    if 'reason_id' in keys:
+        d['reason_id'] = r['reason_id']
+    if 'reason_name' in keys:
+        d['reason_name'] = r['reason_name']
+    return d
 
 
 @app.route('/api/v1/session')
@@ -2142,6 +2239,12 @@ def api_order_types():
               user=f"{u['full_name']} ({u['login']})")
         return api_json({'ok': True}, 201 if not tid else 200)
     journal = request.args.get('journal')
+    # GET /api/v1/reasons — справочник «Причины» (поле журнала «Опека»)
+    if request.args.get('reasons'):
+        conn = get_db()
+        rows = conn.execute('SELECT * FROM reasons ORDER BY name').fetchall()
+        conn.close()
+        return api_json([{'id': r['id'], 'name': r['name']} for r in rows])
     conn = get_db()
     if journal:
         if journal not in JOURNAL_TYPES or not can_access_journal(u, journal):
@@ -2187,8 +2290,9 @@ def api_orders(journal):
         abort(403)
     q = request.args.get('q', '').strip()
     d1 = request.args.get('d1'); d2 = request.args.get('d2')
-    sql = ('SELECT o.*, t.name AS type_name FROM orders o '
-           'LEFT JOIN order_types t ON t.id=o.order_type_id WHERE o.journal=?')
+    sql = ('SELECT o.*, t.name AS type_name, rs.name AS reason_name FROM orders o '
+           'LEFT JOIN order_types t ON t.id=o.order_type_id '
+           'LEFT JOIN reasons rs ON rs.id=o.reason_id WHERE o.journal=?')
     params = [journal]
     if q:
         sql += (' AND (o.order_number LIKE ? OR o.person_fio LIKE ? '
@@ -2205,6 +2309,22 @@ def api_orders(journal):
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return api_json([_order_row_to_dict(r) for r in rows])
+
+
+def _api_reason_id(conn, journal, data):
+    """reason_id для API-запроса: только в журнале «Опека» (справочник «Причины»).
+
+    Принимается готовый reason_id или наименование reason (регистрируется в
+    справочнике автоматически). Для остальных журналов — всегда None.
+    """
+    if not REASONS_ENABLED.get(journal):
+        return None
+    rid = data.get('reason_id')
+    if rid:
+        ok = conn.execute('SELECT 1 FROM reasons WHERE id=?', (int(rid),)).fetchone()
+        if ok:
+            return int(rid)
+    return _get_or_create_reason(conn, data.get('reason') or '')
 
 
 @app.route('/api/v1/journal/<journal>/orders', methods=['POST'])
@@ -2231,11 +2351,12 @@ def api_order_create(journal):
         type_id = int(type_id) if ok else None
     cur = conn.execute(
         'INSERT INTO orders(journal, order_number, order_date, order_type_id, '
-        'person_fio, specialist_fio, note) VALUES (?,?,?,?,?,?,?)',
+        'person_fio, specialist_fio, note, reason_id) VALUES (?,?,?,?,?,?,?,?)',
         (journal, order_number, order_date, type_id,
          (data.get('person_fio') or '').strip(),
          (data.get('specialist_fio') or '').strip(),
-         (data.get('note') or '').strip()))
+         (data.get('note') or '').strip(),
+         _api_reason_id(conn, journal, data)))
     conn.commit()
     oid = cur.lastrowid
     conn.close()
@@ -2256,8 +2377,10 @@ def api_order_item(oid):
     if not can_access_journal(u, journal):
         conn.close(); abort(403)
     if request.method == 'GET':
-        full = conn.execute('SELECT o.*, t.name AS type_name FROM orders o '
+        full = conn.execute('SELECT o.*, t.name AS type_name, rs.name AS reason_name '
+                            'FROM orders o '
                             'LEFT JOIN order_types t ON t.id=o.order_type_id '
+                            'LEFT JOIN reasons rs ON rs.id=o.reason_id '
                             'WHERE o.id=?', (oid,)).fetchone()
         conn.close()
         return api_json(_order_row_to_dict(full))
@@ -2274,6 +2397,11 @@ def api_order_item(oid):
     for f in API_JOURNAL_FIELDS:
         if f in data:
             upd[f] = (data[f] or '').strip() if isinstance(data[f], str) else data[f]
+    # причина приказа (журнал «Опека»): reason_id или наименование reason;
+    # если поле не передано в запросе — остаётся без изменений
+    upd['reason_id'] = row['reason_id'] if 'reason_id' in row.keys() else None
+    if REASONS_ENABLED.get(journal) and ('reason_id' in data or 'reason' in data):
+        upd['reason_id'] = _api_reason_id(conn, journal, data)
     if upd['order_type_id']:
         ok = conn.execute('SELECT 1 FROM order_types WHERE id=? AND kind=?',
                           (int(upd['order_type_id']), journal)).fetchone()
@@ -2284,9 +2412,10 @@ def api_order_item(oid):
     if '-' not in _num and _num.split('-')[0].isdigit():
         upd['order_number'] = _num + journal_prefix(conn, journal)
     conn.execute('UPDATE orders SET order_number=?, order_date=?, order_type_id=?, '
-                 'person_fio=?, specialist_fio=?, note=? WHERE id=?',
+                 'person_fio=?, specialist_fio=?, note=?, reason_id=? WHERE id=?',
                  (upd['order_number'], upd['order_date'], upd['order_type_id'],
-                  upd['person_fio'], upd['specialist_fio'], upd['note'], oid))
+                  upd['person_fio'], upd['specialist_fio'], upd['note'],
+                  upd['reason_id'], oid))
     conn.commit(); conn.close()
     audit('ПРИКАЗ ИЗМЕНЁН (API)', f'id={oid}, №={upd["order_number"]}', user=f"{u['full_name']} ({u['login']})")
     return api_json({'ok': True})

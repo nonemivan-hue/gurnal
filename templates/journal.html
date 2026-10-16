@@ -15,6 +15,14 @@
     </label>
     <label>Ф.И.О. в отношении кого приказ <input name="person_fio" required></label>
     <label>ФИО специалиста <input name="specialist_fio" value="{{ cu.full_name if cu else '' }}"></label>
+    {% if has_reason %}{# журнал «Опека»: причина приказа берётся из справочника «Причины» #}
+    <label>Причина
+      <select name="reason_id">
+        <option value="">— не выбрана —</option>
+        {% for rs in reasons %}<option value="{{ rs.id }}">{{ rs.name }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
     <label>Примечание <input name="note" placeholder="необязательно"></label>
     <label>Скан (PDF) <input type="file" name="scan" accept=".pdf,application/pdf"></label>
     <button class="btn primary" type="submit">Зарегистрировать</button>
@@ -68,10 +76,11 @@
 
 <table class="grid" id="journalTable">
   {# заголовки: клик по столбцу — сортировка (по дате и номеру — с учётом числовых значений) #}
+  {% set headers = ['№ п/п','№ приказа','Дата','Наименование приказа','Ф.И.О. в отношении кого','ФИО специалиста'] + (['Причина'] if has_reason else []) + ['Примечание','Скан'] %}
   <tr>
     <th class="chk-col no-print"><input type="checkbox" id="chkAll" title="Выделить все строки"
         onclick="toggleAllChecked(this.checked)"></th>
-    {% for h in ['№ п/п','№ приказа','Дата','Наименование приказа','Ф.И.О. в отношении кого','ФИО специалиста','Примечание','Скан'] %}
+    {% for h in headers %}
     <th class="sortable" data-sortcol="{{ loop.index0 + 1 }}" onclick="sortByColumn(this)"
         title="Сортировать по столбцу «{{ h }}»">{{ h }}<span class="sort-ind"></span></th>
     {% endfor %}
@@ -80,7 +89,7 @@
   {# строка фильтрации-воронки для каждого столбца #}
   <tr class="filter-row no-print">
     <th class="no-print"></th>
-    {% for h in ['№ п/п','№ приказа','Дата','Наименование приказа','Ф.И.О. в отношении кого','ФИО специалиста','Примечание','Скан'] %}
+    {% for h in headers %}
     <th class="filter-cell">
       <span class="funnel" onclick="toggleFilter(this)" title="Фильтр по столбцу «{{ h }}»">⏷</span>
       <input type="search" class="col-filter" data-col="{{ loop.index0 + 1 }}" placeholder="фильтр…" hidden>
@@ -100,19 +109,21 @@
     <td>{{ r.type_name or '—' }}</td>
     <td>{{ r.person_fio }}</td>
     <td>{{ r.specialist_fio }}</td>
+    {% if has_reason %}<td class="reason-cell">{{ r.reason_name or '—' }}</td>{% endif %}
     <td>{{ r.note if 'note' in r.keys() else '' }}</td>
     <td>{% if r.scan_path %}<a href="{{ url_for('order_scan', oid=r.id) }}" target="_blank">📄 PDF</a>{% else %}—{% endif %}</td>
     <td class="actions no-print">
       <button class="btn sm" data-id="{{ r.id }}" data-number="{{ r.order_number }}" data-date="{{ r.order_date }}"
               data-typeid="{{ r.order_type_id or '' }}" data-person="{{ r.person_fio }}" data-spec="{{ r.specialist_fio }}"
               data-note="{{ r.note if 'note' in r.keys() else '' }}"
+              {% if has_reason %}data-reasonid="{{ r.reason_id or '' }}" data-reason="{{ r.reason_name or '' }}"{% endif %}
               onclick="openEdit(this)">✏️ Изменить</button>
       <form method="post" action="{{ url_for('order_delete', oid=r.id) }}" style="display:inline"
             onsubmit="return confirm('Удалить приказ?')"><button class="btn sm danger">🗑</button></form>
     </td>
   </tr>
   {% endfor %}
-  {% if not rows %}<tr class="empty-row"><td colspan="10" class="empty">Нет записей</td></tr>{% endif %}
+  {% if not rows %}<tr class="empty-row"><td colspan="{{ 9 + (1 if has_reason else 0) }}" class="empty">Нет записей</td></tr>{% endif %}
 </table>
 
 <div class="panel" id="editPanel" style="display:none">
@@ -128,6 +139,14 @@
     </label>
     <label>Ф.И.О. в отношении кого <input name="person_fio" id="e_person"></label>
     <label>ФИО специалиста <input name="specialist_fio" id="e_spec"></label>
+    {% if has_reason %}{# журнал «Опека»: причина из справочника «Причины» #}
+    <label>Причина
+      <select name="reason_id" id="e_reason">
+        <option value="">— не выбрана —</option>
+        {% for rs in reasons %}<option value="{{ rs.id }}">{{ rs.name }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
     <label>Примечание <input name="note" id="e_note"></label>
     <label>Заменить скан (PDF) <input type="file" name="scan" accept=".pdf,application/pdf"></label>
     <button class="btn primary">Сохранить</button>
@@ -145,6 +164,16 @@ function openEdit(b){
   document.getElementById('e_spec').value = d.spec || '';
   document.getElementById('e_note').value = d.note || '';
   document.getElementById('e_type').value = d.typeid || '';
+  const eReason = document.getElementById('e_reason');
+  if(eReason){
+    // выбор причины из справочника; если у приказа причина вне списка — добавляем её
+    let val = d.reasonid || '';
+    if(val && ![...eReason.options].some(o => o.value === val)){
+      const o = new Option(d.reason, val, false, true);
+      eReason.add(o);
+    }
+    eReason.value = val;
+  }
   document.getElementById('editNumTitle').textContent = d.number;
   document.getElementById('editPanel').style.display = 'block';
   document.getElementById('editPanel').scrollIntoView({behavior:'smooth'});
