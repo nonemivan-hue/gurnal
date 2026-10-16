@@ -1182,6 +1182,11 @@ def _orders_xlsx_headers(journal):
             'Ф.И.О. в отношении кого приказ', 'ФИО специалиста', 'Примечание']
 
 
+# SQL-выражение для числовой части номера приказа (до первого дефиса),
+# используется для сортировки документов: сначала по дате, внутри даты - по номеру
+_ORDER_NUM_SQL = ("CAST(NULLIF(SUBSTR({col}, 1, INSTR({col} || '-', '-')), '') AS INTEGER)")
+
+
 def next_order_number(conn, journal):
     conn.execute('UPDATE counters SET value=value+1 WHERE journal=?', (journal,))
     row = conn.execute('SELECT value FROM counters WHERE journal=?', (journal,)).fetchone()
@@ -1207,8 +1212,9 @@ def journal_list(journal):
         sql += ' AND (o.order_number LIKE ? OR o.person_fio LIKE ? OR o.specialist_fio LIKE ?)'
         like = f'%{q}%'
         params += [like, like, like]
-    sql += (' ORDER BY o.order_date DESC, '
-            "CAST(NULLIF(SUBSTR(o.order_number, 1, INSTR(o.order_number || '-', '-')), '') AS INTEGER) DESC")
+    # сортировка документов: по дате, внутри даты - по номеру
+    sql += (' ORDER BY o.order_date DESC, ' + _ORDER_NUM_SQL.format(col='o.order_number') +
+            ' DESC, o.order_number DESC')
     rows = conn.execute(sql, params).fetchall()
     types = conn.execute('SELECT * FROM order_types WHERE kind=? ORDER BY name',
                          (journal,)).fetchall()
@@ -1786,7 +1792,9 @@ def _query_report_rows(d1, d2, journal=None):
     if journal:
         sql += ' AND o.journal=?'
         params.append(journal)
-    sql += ' ORDER BY o.order_date, o.order_number'
+    # сортировка документов: по дате, внутри даты - по номеру
+    sql += (' ORDER BY o.order_date, ' + _ORDER_NUM_SQL.format(col='o.order_number') +
+            ', o.order_number')
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return rows
@@ -2055,7 +2063,9 @@ def api_orders(journal):
         sql += ' AND o.order_date>=?'; params.append(d1)
     if d2:
         sql += ' AND o.order_date<=?'; params.append(d2)
-    sql += ' ORDER BY o.order_date DESC, o.order_number DESC'
+    # сортировка документов: по дате, внутри даты - по номеру
+    sql += (' ORDER BY o.order_date DESC, ' + _ORDER_NUM_SQL.format(col='o.order_number') +
+            ' DESC, o.order_number DESC')
     conn = get_db()
     rows = conn.execute(sql, params).fetchall()
     conn.close()
