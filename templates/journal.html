@@ -37,11 +37,22 @@
   <input name="q" value="{{ q }}" placeholder="Поиск по номеру / ФИО…">
   <button class="btn">Найти</button>
   {% if q %}<a class="btn" href="{{ url_for('journal_list', journal=journal) }}">Сброс</a>{% endif %}
+  <span class="hint" id="filterCount"></span>
 </form>
 
-<table class="grid">
+<table class="grid" id="journalTable">
   <tr><th>№ п/п</th><th>№ приказа</th><th>Дата</th><th>Наименование приказа</th>
       <th>Ф.И.О. в отношении кого</th><th>ФИО специалиста</th><th>Примечание</th><th>Скан</th><th class="no-print"></th></tr>
+  {# строка фильтрации-воронки для каждого столбца #}
+  <tr class="filter-row no-print">
+    {% for h in ['№ п/п','№ приказа','Дата','Наименование приказа','Ф.И.О. в отношении кого','ФИО специалиста','Примечание','Скан'] %}
+    <th class="filter-cell">
+      <span class="funnel" onclick="toggleFilter(this)" title="Фильтр по столбцу «{{ h }}»">⏷</span>
+      <input type="search" class="col-filter" data-col="{{ loop.index0 }}" placeholder="фильтр…" hidden>
+    </th>
+    {% endfor %}
+    <th class="no-print"></th>
+  </tr>
   {% for r in rows %}
   <tr>
     <td>{{ loop.index }}</td>
@@ -99,5 +110,38 @@ function openEdit(b){
   document.getElementById('editPanel').style.display = 'block';
   document.getElementById('editPanel').scrollIntoView({behavior:'smooth'});
 }
+
+// ===== Фильтрация журнала по столбцам (воронки) =====
+function toggleFilter(f){
+  const inp = f.parentElement.querySelector('.col-filter');
+  inp.hidden = !inp.hidden;
+  if(!inp.hidden) inp.focus();
+  else { inp.value=''; applyFilters(); }
+}
+
+function applyFilters(){
+  const table = document.getElementById('journalTable');
+  const filters = [...document.querySelectorAll('#journalTable .col-filter')]
+    .filter(i => i.value.trim());
+  let shown = 0;
+  table.querySelectorAll('tbody tr, tr:not(.filter-row)').forEach(tr => {
+    if(tr.querySelector('th') || tr.classList.contains('filter-row')) return; // строка заголовков
+    const cells = tr.children;
+    let visible = true;
+    for(const f of filters){
+      const c = cells[+f.dataset.col];
+      const text = (c ? c.textContent : '').toLowerCase();
+      if(!text.includes(f.value.trim().toLowerCase())){ visible = false; break; }
+    }
+    tr.style.display = visible ? '' : 'none';
+    if(visible && cells.length > 1) shown++;
+  });
+  const cnt = document.getElementById('filterCount');
+  if(cnt) cnt.textContent = filters.length ? ('Показано строк: ' + shown) : '';
+}
+
+document.addEventListener('input', e => {
+  if(e.target.classList && e.target.classList.contains('col-filter')) applyFilters();
+});
 </script>
 {% endblock %}

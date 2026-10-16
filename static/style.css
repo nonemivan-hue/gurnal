@@ -74,3 +74,11 @@ table.grid{width:100%;border-collapse:collapse;background:#fff;margin:14px 0;box
 .update-help ol,.update-help ul{margin:4px 0 8px 20px;padding:0;}
 .update-help li{margin:3px 0;font-size:14px;}
 .update-help code{background:#e8eef4;padding:1px 5px;border-radius:4px;font-size:13px;}
+
+/* ===== Фильтрация журнала по столбцам (воронки) ===== */
+.filter-row th{background:#f3f6fa;padding:4px 6px;border-bottom:2px solid #d5deea;}
+.funnel{cursor:pointer;color:#5b7592;font-size:13px;user-select:none;padding:0 4px;}
+.funnel:hover{color:#1c3f63;}
+.col-filter{width:100%;box-sizing:border-box;font-size:12px;padding:3px 6px;border:1px solid #c6d2e0;border-radius:4px;}
+#filterCount{margin-left:8px;color:#1c3f63;}
+@media print{.filter-row{display:none!important;}}
