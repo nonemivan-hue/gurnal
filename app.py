@@ -25,7 +25,7 @@ from datetime import date, datetime
 
 from flask import (
     Flask, render_template, request, redirect, url_for, session, flash,
-    send_file, abort, Response, g
+    send_file, abort, Response, g, jsonify
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -685,6 +685,13 @@ def _guard():
     ep = request.endpoint or ''
     if request.path.startswith('/api/'):
         if ep in ('api_info', 'api_user'):
+            return
+        if ep == 'api_scans_upload':
+            # пакетная загрузка документов из «Сервиса»: работает по cookie-сессии,
+            # права (только Администратор) проверяет сам обработчик
+            if not session.get('user_id'):
+                return redirect(url_for('login'))
+            touch_active_session(session['user_id'])
             return
         return          # дальнейшие права проверяет обработчик (401 вместо редиректа)
     if not session.get('user_id'):
@@ -1592,44 +1599,42 @@ def _find_type_id(conn, journal, name):
         return r['id'] if r else None
 
 
-@app.route('/journal/<journal>/scans')
-def journal_scans_page(journal):
-    """Страница пакетной загрузки PDF-сканов приказов в журнал."""
-    if journal not in JOURNAL_TYPES:
-        abort(404)
-    user = current_user()
-    if not can_access_journal(user, journal):
+@app.route('/service/scans')
+def scans_upload_page():
+    """Страница пакетной загрузки PDF-сканов приказов (перенесена в сервис)."""
+    if not is_admin():
         abort(403)
     conn = get_db()
-    types = conn.execute('SELECT id, name FROM order_types WHERE kind=? ORDER BY name',
-                         (journal,)).fetchall()
-    sfx = journal_prefix(conn, journal)   # префикс из справочника видов приказов (v1.5.0)
+    all_types = {}
+    for j in JOURNAL_TYPES:
+        all_types[j] = conn.execute(
+            'SELECT id, name FROM order_types WHERE kind=? ORDER BY name', (j,)).fetchall()
     conn.close()
-    return render_template('journal_scans.html', journal=journal,
-                           title=JOURNAL_TITLES[journal], types=types,
-                           suffix=sfx)
+    return render_template('scans_upload.html', journals=JOURNAL_TYPES,
+                           titles=JOURNAL_TITLES, types_by_journal=all_types)
 
 
-@app.route('/journal/<journal>/scans/upload', methods=['POST'])
-def journal_scans_upload(journal):
+@app.route('/api/scans/upload', methods=['POST'])
+def api_scans_upload():
     """Пакетная загрузка сканов приказов (PDF) в журнал из архива ZIP или списка файлов.
 
-    Правила:
+    Обслуживает страницу «Сервис → Загрузка документов». Правила:
       - принимаются только PDF (и .zip с PDF внутри);
       - если имя файла совпадает с № существующего приказа без скана — скан
         прикрепляется к нему;
       - иначе создаётся новый приказ: реквизиты берутся из имени файла
         (№приказа_дата_ФИО_примечание.pdf); недостающий номер присваивается
         автоматически, дата — текущая;
-      - дубликаты (тот же номер либо дата+ФИО) пропускаются;
-      - столбец «Наименование приказа» из CSV-реестра и шаблонов Excel не
-        используется: наименование всегда выбирается на странице загрузки.
+      - дубликаты (та же пара дата+ФИО) пропускаются;
+      - столбец «Наименование приказа» из реестров не используется:
+        наименование всегда выбирается на странице загрузки.
+    Ответ — JSON: {attached, created, skipped, errors[], message}.
     """
+    if not is_admin():
+        return jsonify({'error': 'Доступ запрещён: раздел доступен только Администратору'}), 403
+    journal = request.form.get('journal', '')
     if journal not in JOURNAL_TYPES:
-        abort(404)
-    user = current_user()
-    if not can_access_journal(user, journal):
-        abort(403)
+        return jsonify({'error': 'Не выбран журнал для загрузки'}), 400
     type_id = request.form.get('order_type_id', type=int)
     spec_fio = request.form.get('specialist_fio', '').strip()
     note_extra = request.form.get('note', '').strip()
@@ -1639,8 +1644,7 @@ def journal_scans_upload(journal):
     if single and single.filename:
         files.append(single)
     if not files or not any(f.filename for f in files):
-        flash('Выберите файлы PDF или ZIP-архив с файлами PDF', 'err')
-        return redirect(url_for('journal_scans_page', journal=journal))
+        return jsonify({'error': 'Выберите файлы PDF или ZIP-архив с файлами PDF'}), 400
 
     today = date.today().isoformat()
     workdir = tempfile.mkdtemp(prefix='scans_')
@@ -1748,12 +1752,11 @@ def journal_scans_upload(journal):
               f'создано={created}, пропущено={skipped}')
         msg = (f'Загрузка завершена: сканов приложено — {attached}, '
                f'приказов создано — {created}, пропущено — {skipped}')
-        if errors:
-            msg += '. Замечания: ' + '; '.join(errors[:8])
-        flash(msg, 'ok')
+        return jsonify({'attached': attached, 'created': created,
+                        'skipped': skipped, 'errors': errors[:20],
+                        'message': msg})
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
-    return redirect(url_for('journal_list', journal=journal))
 
 
 @app.route('/order/<int:oid>/update', methods=['POST'])
@@ -1915,6 +1918,25 @@ def _query_report_rows(d1, d2, journal=None):
     return rows
 
 
+def _query_report_rows_sorted_asc(d1, d2, journal=None):
+    """Строки отчёта «распечатка журнала»: сортировка по возрастанию —
+    сначала дата приказа, внутри одной даты — номер (числовое сравнение:
+    2 < 9 < 12 < 12а < 105). Используется в печати/выгрузке Excel и Word."""
+    conn = get_db()
+    sql = ('SELECT o.*, t.name AS type_name FROM orders o '
+           'LEFT JOIN order_types t ON t.id=o.order_type_id '
+           'WHERE o.order_date>=? AND o.order_date<=?')
+    params = [d1, d2]
+    if journal:
+        sql += ' AND o.journal=?'
+        params.append(journal)
+    sql += (' ORDER BY o.order_date ASC, ' + _ORDER_NUM_SQL.format(col='o.order_number') +
+            ' ASC, o.order_number ASC')
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return rows
+
+
 @app.route('/reports')
 def reports():
     user = current_user()
@@ -1987,19 +2009,17 @@ def report_journal_print():
     if journal not in JOURNAL_TYPES:
         abort(404)
     d1, d2 = _report_period()
-    rows = _query_report_rows(d1, d2, journal=journal)
+    # выборка по виду приказа; сортировка: по дате, внутри даты — по номеру
+    rows = _query_report_rows_sorted_asc(d1, d2, journal=journal)
     title = f'Журнал «{JOURNAL_TITLES[journal]}» за период'
     data = []
     for i, r in enumerate(rows, 1):
-        name = r['type_name'] or ''
+        # примечание — отдельным столбцом (по ТЗ); наименование — только приказ
         note = r['note'] if 'note' in r.keys() else ''
-        # примечание включается в наименование приказа (по ТЗ — для Опеки)
-        disp_name = (f'{name} ({r["person_fio"]})' if journal == 'opeka' else name)
-        if note:
-            disp_name = f'{disp_name}. Прим.: {note}' if disp_name else f'Прим.: {note}'
         data.append((i, r['order_number'], r['order_date'], r['person_fio'],
-                     disp_name, r['specialist_fio']))
-    headers = ('№ п/п', '№ приказа', 'Дата', 'Ф.И.О.', 'Наименование приказа', 'ФИО специалиста')
+                     r['type_name'] or '', r['specialist_fio'], note))
+    headers = ('№ п/п', '№ приказа', 'Дата', 'Ф.И.О.',
+               'Наименование приказа', 'ФИО специалиста', 'Примечание')
     fmt = request.args.get('fmt')
     if fmt == 'xlsx':
         return _export_xlsx_table(d1, d2, headers, data, title)
@@ -2364,17 +2384,13 @@ def api_report_journal_print():
     if journal not in JOURNAL_TYPES:
         abort(404)
     d1, d2 = _report_period()
-    rows = _query_report_rows(d1, d2, journal=journal)
+    rows = _query_report_rows_sorted_asc(d1, d2, journal=journal)
     data = []
     for i, r in enumerate(rows, 1):
-        name = r['type_name'] or ''
         note = r['note'] if 'note' in r.keys() else ''
-        disp = (f'{name} ({r["person_fio"]})' if journal == 'opeka' else name)
-        if note:
-            disp = f'{disp}. Прим.: {note}' if disp else f'Прим.: {note}'
         data.append({'n': i, 'number': r['order_number'], 'date': r['order_date'],
-                     'fio': r['person_fio'], 'name': disp,
-                     'specialist': r['specialist_fio']})
+                     'fio': r['person_fio'], 'name': r['type_name'] or '',
+                     'specialist': r['specialist_fio'], 'note': note})
     return api_json({'d1': d1, 'd2': d2, 'journal': journal,
                      'title': f'Журнал «{JOURNAL_TITLES[journal]}» за период',
                      'rows': data, 'total': len(data)})
@@ -2518,7 +2534,7 @@ def _export_xlsx_table(d1, d2, headers, data, title):
         ws.append(list(row))
     for cell in ws[4]:
         cell.font = Font(bold=True)
-    widths = [6, 12, 12, 30, 45, 30]
+    widths = [6, 12, 12, 30, 45, 30, 30]
     for i, w in enumerate(widths[:len(headers)], 1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     buf = io.BytesIO()
@@ -2711,6 +2727,63 @@ def service_restore():
         flash(f'Ошибка восстановления: {e}', 'err')
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    return redirect(url_for('service'))
+
+
+@app.route('/service/users')
+def service_users():
+    """Список пользователей для администрирования (смена паролей)."""
+    if not is_admin():
+        abort(403)
+    conn = get_db()
+    users = conn.execute('SELECT e.id, e.full_name, e.position, e.login, '
+                         'e.password_hash, e.pwd_changed_at, r.name AS role_name '
+                         'FROM employees e LEFT JOIN roles r ON r.id=e.role_id '
+                         'ORDER BY r.name DESC, e.full_name').fetchall()
+    conn.close()
+    return jsonify([{'id': u['id'], 'full_name': u['full_name'],
+                     'position': u['position'] or '', 'login': u['login'] or '',
+                     'role': u['role_name'] or '',
+                     'has_password': bool(u['password_hash']),
+                     'pwd_changed_at': u['pwd_changed_at'] or ''} for u in users])
+
+
+@app.route('/service/password', methods=['POST'])
+def service_set_password():
+    """Смена пароля пользователя администратором.
+
+    Форма: user_id (или login), password. Пароль задаётся напрямую; после
+    установки сотрудник при желании сменит его самостоятельно в профиле.
+    Действие фиксируется в аудите.
+    """
+    if not is_admin():
+        abort(403)
+    uid = request.form.get('user_id', type=int)
+    login_name = (request.form.get('login') or '').strip()
+    new_password = request.form.get('password', '')
+    if not uid and not login_name:
+        flash('Не указан пользователь для смены пароля', 'err')
+        return redirect(url_for('service'))
+    if len(new_password) < 4:
+        flash('Новый пароль слишком короткий (минимум 4 символа)', 'err')
+        return redirect(url_for('service'))
+    conn = get_db()
+    if uid:
+        emp = conn.execute('SELECT * FROM employees WHERE id=?', (uid,)).fetchone()
+    else:
+        emp = conn.execute('SELECT * FROM employees WHERE login=?', (login_name,)).fetchone()
+    if not emp:
+        conn.close()
+        flash('Пользователь не найден', 'err')
+        return redirect(url_for('service'))
+    conn.execute('UPDATE employees SET password_hash=?, pwd_changed_at=NULL WHERE id=?',
+                 (generate_password_hash(new_password), emp['id']))
+    conn.commit()
+    conn.close()
+    audit('ПАРОЛЬ ИЗМЕНЁН АДМИНИСТРАТОРОМ',
+          f"пользователь={emp['full_name']} (id={emp['id']}, "
+          f"логин={emp['login'] or '—'})")
+    flash(f"Пароль изменён пользователю «{emp['full_name']}»", 'ok')
     return redirect(url_for('service'))
 
 
