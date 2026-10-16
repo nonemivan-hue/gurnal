@@ -15,8 +15,8 @@
   </form>
   <div class="toolbar">
     <button class="btn" onclick="window.print()">🖨 Печать</button>
-    <a class="btn" href="?d1={{ d1 }}&d2={{ d2 }}{% if extra_args %}&journal={{ extra_args.journal }}{% endif %}&fmt=xlsx">⬇ Excel</a>
-    <a class="btn" href="?d1={{ d1 }}&d2={{ d2 }}{% if extra_args %}&journal={{ extra_args.journal }}{% endif %}&fmt=docx">⬇ Word</a>
+    <a class="btn" href="?d1={{ d1 }}&d2={{ d2 }}{% if extra_args %}{% for k,v in extra_args.items() %}&{{k}}={{v}}{% endfor %}{% endif %}&fmt=xlsx">⬇ Excel</a>
+    <a class="btn" href="?d1={{ d1 }}&d2={{ d2 }}{% if extra_args %}{% for k,v in extra_args.items() %}&{{k}}={{v}}{% endfor %}{% endif %}&fmt=docx">⬇ Word</a>
     <a class="btn" href="{{ url_for('reports') }}">← К отчётам</a>
   </div>
 </div>
